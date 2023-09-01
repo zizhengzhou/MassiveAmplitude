@@ -1,2 +1,2 @@
 # MassiveAmplitude
-Construction of massive amplitudes and EFT operators.
+The project aims to construct massive amplitudes and EFT operators. The method is based on the paper arxiv:2211.16515 and its series. The complete appendix is included in the separate file in appendix only/appendix only.pdf.
