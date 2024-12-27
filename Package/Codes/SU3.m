@@ -1,9 +1,14 @@
+(* ::Package:: *)
+
 LogPri["SU3 Loaded"];
 (*Now only for SU3, to be expanded to SUN*)
+
+
 (* ::Section:: *)
 (*Step1 Specify indices and construct basis*)
 (*Input: identical blocks shape, particle amount*)
 (*Output: all particle indices dict*)
+
 
 (*for gluon, convention tableaux is {{1,2},{3}}*)
 su3ShapeDict = <|"" -> {}, "q" -> {1}, "aq" -> {1, 1}, "g" -> {2, 1}|>;
@@ -21,8 +26,12 @@ GetColorIndDict[shapes_List] := Module[{indAmountList, indDict, lastInd = 0
 
 ConstructColorBasis[nColumn_Integer] := GenerateStandardTableaux[ConstantArray[nColumn, 3]];
 
+
+
 (* ::Section:: *)
 (*Step2 Permute particles to form new young tableaux*)
+
+
 GetPermuteColorIdenticalRules[identicalParticleList_List, colorIndDict_Association] := Module[
   {particleReplaceRules = GetMasslessIdenticalRules[identicalParticleList],
     ReplaceParticle2ColorRule},
@@ -38,8 +47,12 @@ GetPermuteColorInnerRules[colorIndDict_Association] := Module[
 ];
 ReplaceColorTableauxNumber[rule_] := # /. rule&;
 
+
+
 (* ::Section:: *)
 (*Step3 Reduce any YT to standard YT*)
+
+
 defaultYTHead = IYT;
 WarpTableauxWithHead[tableaux_List, head_] := head[tableaux];
 WarpTableauxWithHead[head_] := WarpTableauxWithHead[#, head]&;
@@ -129,8 +142,12 @@ FindColorCor[warpedTableaux_List, warpedBasis_List] := FindColorCor[#, warpedBas
 FindColorCor[warpedBasis_List] := FindColorCor[#, warpedBasis]&;
 FindColorCor[warpedTableaux_, warpedBasis_List] := Coefficient[warpedTableaux, #] & /@ warpedBasis;
 
+
+
 (* ::Section:: *)
 (*Step4 Get Color Operators*)
+
+
 GetColorIdenticalPermutedOperatorDict[identicalParticleLists_List, colorIndDict_Association, genCoorsByRule_] :=
     Module[{operatorDict, rules, coors, PFirst, PAll},
       operatorDict = Table[identicalParticleList -> Null, {identicalParticleList, identicalParticleLists}] // Association;
@@ -194,7 +211,8 @@ GetProjectInnerColorOp[colorIndDict_Association, operatorDict_Association] := Mo
 (* ::Section:: *)
 (*Step5 Combine all*)
 
-Options[ConstructIndependentColoredBasis] = Join[{
+
+(*Options[ConstructIndependentColoredBasis] = Join[{
   ythead -> defaultYTHead,
   allowedmemory -> 4 * 10^9,
   log -> False}, Options@ConstructCFIByFakeDim ,
@@ -214,7 +232,7 @@ ConstructIndependentColoredBasis[spins_List, physicalDim_Integer,
   (*Construct Lorentz*)
   fakeDimList = CalcNeededFakeDim[spins, physicalDim, OptionValue@mass];
   If[OptionValue@log, LogPri["physical dim ", physicalDim, " involves fake dim ", fakeDimList];];
-  If[Length@fakeDimList === {}, Return[{}]];
+  If[Length@fakeDimList === {}, LogPri["lorentz no result"]; Return[{}]];
   fakeDimResult = Association@Table[fd -> ConstructCFIByFakeDim[spins, fd, FilterRules[{opts},
     Options@ConstructCFIByFakeDim]], {fd, fakeDimList}] // DeleteCases[Null] // TimingTest["construct fake basis cost "];
 
@@ -291,7 +309,7 @@ AuxConstructIdenticalColorBasisByFakeDim[
   GetIndependentBasisByTotalOp[{basis_, opDict_}] :=
       basis[[#]]& /@ FindIndependentBasisPos[GetTotalOperator[opDict]];
   GetIndependentBasisByTotalOp @ coloredPhyOperatorDict // Return;
-];
+];*)
 
 Options[AuxConstructIdenticalColorBasis] := {log -> False};
 AuxConstructIdenticalColorBasis[su3ShapeList_, identicalParm_, h_, OptionsPattern[]] := Module[
@@ -302,7 +320,7 @@ AuxConstructIdenticalColorBasis[su3ShapeList_, identicalParm_, h_, OptionsPatter
     projectionOp, proL, proR, metricInvG},
   If[Sort@Keys@su3ShapeDict =!=
       Sort@DeleteDuplicates[su3ShapeList ~ Join ~ Keys@su3ShapeDict],
-    Print["No such SU3 type"];Abort[];];
+    Print["No such SU3 type"]; Return[{}]];
   colorIndDict = GetColorIndDict[su3ShapeDict[#]& /@ su3ShapeList];
   Do[
     If[SubsetQ[Keys@colorIndDict, e[[;; -2]]],
@@ -317,13 +335,13 @@ AuxConstructIdenticalColorBasis[su3ShapeList_, identicalParm_, h_, OptionsPatter
       DeleteDuplicates;
   rulesInnerDict = GetPermuteColorInnerRules[colorIndDict];
 
-  ParaFindRuleMatrix[paraRule_] := ParallelMap[
+  ParaFindRuleMatrix[paraRule_] := Map[
     FindColorCor[colorBasis]@ReduceSU3YT@#&,
     ReplaceColorTableauxNumber[paraRule] /@ colorBasis];
-  ParaFindRuleMatrix[paraRule_, L_, R_, InvG_] := InvG.L.ParallelMap[
+  ParaFindRuleMatrix[paraRule_, L_, R_, InvG_] := InvG . L . Map[
     ((FindColorCor[colorBasis]@ReduceSU3YT@#))&,
     ReplaceColorTableauxNumber[paraRule] /@ colorBasis
-  ].R;
+  ] . R;
   ParaFindRuleMatrix[{}] := IdentityMatrix[Length@colorBasis];
   ParaFindRuleMatrix[{}, L_, R_, InvG_] := IdentityMatrix[Length@InvG];
 
@@ -336,11 +354,12 @@ AuxConstructIdenticalColorBasis[su3ShapeList_, identicalParm_, h_, OptionsPatter
   (
     colorInnerOpDict = GetColorInnerPermutedOperatorDict[colorIndDict, ruleInnerCoorsDict[#]&];
     projectionOp = GetProjectInnerColorOp[colorIndDict, colorInnerOpDict];
+    If[projectionOp==={{1}},projectionOp=IdentityMatrix[Length@colorBasis]];
     independentPosList = FindIndependentBasisPos[projectionOp];
     If[Length@independentPosList == 0, Return@{colorIndDict, {}, <||>}];
     proL = projectionOp[[independentPosList, ;;]];
     proR = Transpose @ proL;
-    metricInvG = Inverse[proL.proR];
+    metricInvG = Inverse[proL . proR];
   ) // AbsoluteTiming // (If[OptionValue@log, LogPri["project color basis cost ", #[[1]]]];)&;
 
   ruleIdenticalCoorsDict = Table[

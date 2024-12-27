@@ -1,5 +1,12 @@
 (* ::Package:: *)
+
 LogPri["Operator Loaded"];
+
+
+
+(* ::Subsection:: *)
+(*Amp2BrasList*)
+
 
 Amp2BrasList[amp_] :=
     Module[ {factor, totalFactor = 1, bras},
@@ -31,6 +38,12 @@ Amp2MetaInfo[amp_, np_Integer, OptionsPattern[]] := Module[
   If[Count[spins, Negative] + Count[antispinors, Negative] > 0, Return[Null]];
   Return[{spins , antispinors}];
 ];
+
+
+
+(* ::Subsection:: *)
+(*FindPsiChain*)
+
 
 Options[FindPsiChain] = {mass -> All};
 FindPsiChain[amp_, np_Integer, OptionsPattern[]] := Module[
@@ -198,580 +211,658 @@ FindPsiChain[amp_, np_Integer, OptionsPattern[]] := Module[
 ];
 FindPsiChain[np_Integer, opts : OptionsPattern[]] := FindPsiChain[#, np, Sequence @@ FilterRules[{opts}, Options[FindPsiChain]]]&;
 
-(*For antispinor 1 (A case), use spin = -/+ 1 is fine in spins_List, \
-as A is not determined from antispinor but from psiChain{ab,1,xx,8,sb} structure*)
-Options[ConstructOpInSpinIndex] = {mass -> All};
-ConstructOpInSpinIndex[amp_, np_Integer, spins_List, OptionsPattern[]] :=
 
-    Module[
-      {
-        flattenNp, psiChain, chains, spInN, spinorIndex, SpinorObj, obj, index, findPtclSpin, opList, chain,
-        DerPObj, DerMObj, FPObj, FMObj, APObj, AMObj, fPos, lorInN, lorIndex, lorIndexP,
-        loopi, firstSpinorIndexN, firstSpinorObj, signFlipflop, testA,
-        testAbSb
-      },
-      (*Make Psi chain*)
-      psiChain = FindPsiChain[amp, np, mass -> OptionValue@mass];
-      (*Print["psiChian Found: ",psiChain];*)
-      chains = psiChain[[2]];
-      If[(chains[[1]] // Head // ToString) != "List",
-        chains = List[chains];
-      ];
-      findPtclSpin[ptcl_] :=
-          If[MemberQ[Range[np + 1, 2 * np], ptcl], spins[[-ptcl + 2 * np + 1]],
-            spins[[ptcl]]];
-      (*Make spinor index*)
-      spInN = 1;
-      spinorIndex[n_] := Symbol["SI" <> ToString[n]];
-      lorInN = 1;
-      lorIndex[n_] := Symbol["LI" <> ToString[n]];
-      lorIndexP[n_] := Module[{}, lorInN++;Symbol["LI" <> ToString[n]]];
-      (*SpinorObj is an object with 1 spinor index*)
-      SpinorObj[obj_, sign_, index_, head___] := {obj, sign, index, head};
-      obj[spinorObj_] := spinorObj[[1]];
-      index[spinorObj_] := spinorObj[[3]];
-      DerPObj[obj_, indexL_, indexR_] := {"D+", obj, indexL, indexR};
-      DerMObj[obj_, indexL_, indexR_] := {"D-", obj, indexL, indexR};
-      FPObj[obj_, indexL_, indexR_] := {"F+", obj, indexL, indexR};(*F+*)
-      FMObj[obj_, indexL_, indexR_] := {"F-", obj, indexL, indexR};(*F-*)
-      APObj[obj_, indexL_, indexR_] := {"A+", obj, indexL, indexR};
-      AMObj[obj_, indexL_, indexR_] := {"A-", obj, indexL, indexR};(*A+ for >[ and A- for ]<*)
-      flattenNp[n_] := If[n > np, - n + 2 * np + 1, n];
-      (*make op List with D and spinorObj*)
-      opList = {};
-      Do[chain = chains[[i]];
-      signFlipflop = If[psiChain[[3]][[i]] > 0, + 1, -1];
-      testA == False;
-      (*recored sigma or sigma bar*)
-      If[ToString[chain[[1]]] == "circle", (*circle case*)
-        chain = Drop[chain, 1];
-        firstSpinorIndexN = spInN;
-        firstSpinorObj = flattenNp[chain[[1]]];
-        (*spInN++;*)
-        chain = Drop[chain, 1];
-        While[Length[chain] != 0,
-          If[signFlipflop == 1,
-            AppendTo[opList, DerPObj[flattenNp[chain[[1]]], spinorIndex[spInN], spinorIndex[spInN + 1]]],
-            AppendTo[opList, DerMObj[flattenNp[chain[[1]]], spinorIndex[spInN], spinorIndex[spInN + 1]]]];
-          signFlipflop = -signFlipflop;
-          spInN++;
-          chain = Drop[chain, 1]
-        ];
-        If[signFlipflop == 1,
-          AppendTo[opList, DerPObj[flattenNp[firstSpinorObj], spinorIndex[spInN], spinorIndex[firstSpinorIndexN]]],
-          AppendTo[opList, DerMObj[flattenNp[firstSpinorObj], spinorIndex[spInN], spinorIndex[firstSpinorIndexN]]]];
-        spInN++;
-        , (*absb case*)
-        testA = Evaluate[((ToString[chain[[1]]] != ToString[chain[[-1]]]) &&
-            ((-chain[[2]] + 2 np + 1 == chain[[-2]]) || (chain[[2]] == -chain[[-2]] + 2 np + 1)))];
-        testAbSb = If[(chain[[1]] // ToString) == "ab", -1, 1];
-        chain = Drop[chain, 1];
-        If[testA != False,
-          firstSpinorIndexN = spInN,
-          AppendTo[opList, SpinorObj[flattenNp[chain[[1]]], If[findPtclSpin[chain[[1]]] == 1 || findPtclSpin[chain[[1]]] == -1,
-            testAbSb, findPtclSpin[chain[[1]]]] , spinorIndex[spInN], 0]]
-        ];
-        While[(ToString[chain[[3]]] != ToString[ab]) && (ToString[chain[[3]]] != ToString[sb]),
-          If[signFlipflop == 1,
-            AppendTo[opList, DerPObj[flattenNp[chain[[2]]], spinorIndex[spInN], spinorIndex[spInN + 1]]],
-            AppendTo[opList, DerMObj[flattenNp[chain[[2]]], spinorIndex[spInN], spinorIndex[spInN + 1]]]];
-          signFlipflop = -signFlipflop;
-          spInN++;
-          chain = Drop[chain, 1]
-        ];
-        If[testA != False,
-          If[signFlipflop == 1,
-            AppendTo[opList, APObj[flattenNp[chain[[2]]], spinorIndex[spInN], spinorIndex[firstSpinorIndexN]]],
-            AppendTo[opList, AMObj[flattenNp[chain[[2]]], spinorIndex[spInN], spinorIndex[firstSpinorIndexN]]]
-          ];
-          ,
-          testAbSb = If[(chain[[-1]] // ToString) == "ab", -1, 1];
-          AppendTo[opList, SpinorObj[flattenNp[chain[[2]]], If[findPtclSpin[chain[[2]]] == 1 || findPtclSpin[chain[[2]]] == -1,
-            testAbSb, findPtclSpin[chain[[2]]]], spinorIndex[spInN], 1]]];
-        spInN++;
-      ];
-        , {i, Length[chains]}];
-      (*Print["SpinorObj Done: ", opList];*)
-      (*convert spin 1 spinObj to F and A*)
-      Do[If[spins[[i]] == 1 || spins[[i]] == -1,
-        fPos = Join[Position[opList, {i, 1, ___}, 1],
-          Position[opList, {i, -1, ___}, 1],
-          Position[opList, {-i + 2 np + 1, 1, ___}, 1],
-          Position[opList, {-i + 2 np + 1, -1, ___}, 1]];
-        If[OddQ[Length[fPos]], Throw[{opList, "Find F Error"}]];
-        If[Length[fPos] != 0,
-          If[Part[opList, fPos[[1]][[1]]][[2]] == Part[opList, fPos[[2]][[1]]][[2]],
-            opList = Join[opList,
-              {If[spins[[i]] == 1, FPObj, FMObj]
-              [i // flattenNp, Part[opList, fPos[[1]][[1]]] // index, Part[opList, fPos[[2]][[1]]] // index]}];
-            opList = Delete[opList, fPos]
-            ,
-            opList = Join[opList,
-              {If[(Part[opList, fPos[[1]][[1]]][[-1]] == 1 && Part[opList, fPos[[1]][[1]]][[2]] == 1)
-                  || (Part[opList, fPos[[1]][[1]]][[-1]] == -1 && Part[opList, fPos[[1]][[1]]][[2]] == 0),
-                AMObj, APObj]
-              [i // flattenNp, Part[opList, fPos[[1]][[1]]] // index, Part[opList, fPos[[2]][[1]]] // index]}];
-            opList = Delete[opList, fPos]
-
-          ]]
-      ]
-        , {i, Length[spins]}];
-      (*convert F and D to {F sigma} and {D sigma}*)
-      opList = opList /. {
-        {n_Integer, 1 / 2, i_, _} :> {n, 1 / 2, i},
-        {n_Integer, -1 / 2, i_, _} :> {n, -1 / 2, i},
-        {"D+", i_, iL_, iR_} :> {{"D", i, lorIndex[lorInN]}, {"\[Sigma]", lorIndexP[lorInN], iL, iR}},
-        {"D-", i_, iL_, iR_} :> {{"D", i, lorIndex[lorInN]}, {"\[Sigma]Bar", lorIndexP[lorInN], iL, iR}},
-        {"A+", i_, iL_, iR_} :> {{"A", i, lorIndex[lorInN]}, {"\[Sigma]", lorIndexP[lorInN], iL, iR}},
-        {"A-", i_, iL_, iR_} :> {{"A", i, lorIndex[lorInN]}, {"\[Sigma]Bar", lorIndexP[lorInN], iL, iR}},
-        {"F+", i_, iL_, iR_} :> {{"F+", i, lorIndex[lorInN], lorIndex[lorInN + 1]},
-          {"\[Sigma]Bar", lorIndexP[lorInN], lorIndexP[lorInN], iL, iR}},
-        {"F-", i_, iL_, iR_} :> {{"F-", i, lorIndex[lorInN], lorIndex[lorInN + 1]},
-          {"\[Sigma]", lorIndexP[lorInN], lorIndexP[lorInN], iL, iR}}};
-      (*===TODO===check the F+F- sigma convention===TODO===*)
-      (*flatten {X sigma}*)
-      loopi = 1;
-      While[loopi != Length[opList] + 1,
-        If[Depth[opList[[loopi]]] == 3,
-          opList = Join[opList, opList[[loopi]]];
-          opList = Delete[opList, loopi];
-          loopi = loopi - 1
-        ];
-        loopi++;
-      ];
-      Do[
-        If[spins[[i]] == 0,
-          AppendTo[opList, {"\[Phi]", i}]
-        ],
-        {i, Length[spins]}];
+(* ::Section:: *)
+(*Translation *)
 
 
-      (*Print["Op Done: ",opList];*)
-      Append[opList, psiChain[[1]]]
-    ];
-
-ConstructOpInSpinIndex[amp_, np_Integer, opts : OptionsPattern[]] :=
-    ConstructOpInSpinIndex[amp, np,
-      #[[1]] * (#[[2]] /. {1 -> -1, 2 -> -1, 0 -> 1}) &
-      [Amp2MetaInfo[amp, np, Sequence @@ FilterRules[{opts}, Options[Amp2MetaInfo]]]],
-      Sequence @@ FilterRules[{opts}, Options[ConstructOpInSpinIndex]]
-    ];
+(* ::Subsection:: *)
+(*ToolFun*)
 
 
-(*spinorObjOpDisplayForm is used to prevew spinorObj only*)
-spinorObjOpDisplayForm[x_] := Module[{dic},
-  dic = {
-    {n_Integer, 1 / 2, i_} :> Subscript[Subscript[SuperPlus["\[Psi]"], n], i],
-    {n_Integer, -1 / 2, i_} :> Subscript[Subscript[SuperMinus["\[Psi]"], n], i],
-    {"D", n_, i_} :> Subscript[Subscript["D", n], i],
-    {"A", n_, i_} :> Subscript[Subscript["A", n], i],
-    {"\[Sigma]", LI_, S1_, S2_} :> Subscript[Superscript["\[Sigma]", LI], List[S1, S2]],
-    {"\[Sigma]Bar", LI_, S1_, S2_} :> Subscript[Superscript[OverBar["\[Sigma]"], LI], List[S1, S2]],
-    {"\[Sigma]", L1_, L2_, S1_, S2_} :> Subscript[Superscript["\[Sigma]", {L1, L2}], List[S1, S2]],
-    {"\[Sigma]Bar", L1_, L2_, S1_, S2_} :> Subscript[Superscript[OverBar["\[Sigma]"], {L1, L2}], List[S1, S2]],
-    {"F+", n_, i_, j_} :> Subscript[Subscript[SuperPlus["F"], n], {i, j}],
-    {"F-", n_, i_, j_} :> Subscript[Subscript[SuperMinus["F"], n], {i, j}],
-    {"\[Phi]", i_} :> Subscript["\[Phi]", i],
-    {"Tr"} -> "Tr",
-    {"\[Epsilon]", i_, j_, k_} :> Superscript["\[Epsilon]", {i, j, k}],
-    {"\[Epsilon]i", i_, j_, k_} :> Subscript["\[Epsilon]", {i, j, k}],
-    {"TF", i_, j_, k_} :> Superscript[Subscript[Superscript["\[Lambda]", i], j], k],
-    SUNTF[i_, j_, k_] :> Superscript[Subscript[Superscript["\[Lambda]", i], j], k],
-    SUNFDelta[i_, j_] :> Subscript[Subscript["\[Delta]", i], j],
-    {n_Integer, 1 / 2, i_, j_} :> Superscript[Subscript[Subscript[SuperPlus["\[Psi]"], n], i], j],
-    {n_Integer, -1 / 2, i_, j_} :> Superscript[Subscript[Subscript[SuperMinus["\[Psi]"], n], i], j],
-    {n_Integer, 1 / 2 I, i_, j_} :> Subscript[Subscript[Subscript[SuperPlus["\[Psi]"], n], i], j],
-    {n_Integer, -1 / 2 I, i_, j_} :> Subscript[Subscript[Subscript[SuperMinus["\[Psi]"], n], i], j],
-    {"F+", n_, i_, j_, k_} :> Superscript[Subscript[Subscript[SuperPlus["F"], n], {i, j}], k],
-    {"F-", n_, i_, j_, k_} :> Superscript[Subscript[Subscript[SuperMinus["F"], n], {i, j}], k],
-    {"F+", n_, i_, j_, k_, l_} :> Superscript[Subscript[Subscript[Subscript[SuperPlus["F"], n], {i, j}], k], l],
-    {"F-", n_, i_, j_, k_, l_} :> Superscript[Subscript[Subscript[Subscript[SuperMinus["F"], n], {i, j}], k], l],
-    {"\[Epsilon]", i_, j_, k_} :> Superscript["\[Epsilon]", {i, j, k}],
-    {"\[Epsilon]i", i_, j_, k_} :> Subscript["\[Epsilon]", {i, j, k}],
-    {"TF", i_, j_, k_} :> Superscript[Subscript[Superscript["\[Lambda]", i], j], k],
-    SUNTF[i_, j_, k_] :> Superscript[Subscript[Superscript["\[Lambda]", i], j], k],
-    {n_Integer, 1 / 2, i_, j_} :> Superscript[Subscript[Subscript[SuperPlus["\[Psi]"], n], i], j],
-    {n_Integer, -1 / 2, i_, j_} :> Superscript[Subscript[Subscript[SuperMinus["\[Psi]"], n], i], j],
-    {n_Integer, 1 / 2 I, i_, j_} :> Subscript[Subscript[Subscript[SuperPlus["\[Psi]"], n], i], j],
-    {n_Integer, -1 / 2 I, i_, j_} :> Subscript[Subscript[Subscript[SuperMinus["\[Psi]"], n], i], j],
-    {"F+", n_, i_, j_, k_} :> Superscript[Subscript[Subscript[SuperPlus["F"], n], {i, j}], k],
-    {"F-", n_, i_, j_, k_} :> Superscript[Subscript[Subscript[SuperMinus["F"], n], {i, j}], k]
-  };
-  (x /. dic)];
+ClearAll[ComplementMultiSet];
+ComplementMultiSet::usage = "Define the Complement for Multiset. Preserve Order";
+ComplementMultiSet[listAll_List, listsToRemove__List] := Fold[
+  DeleteCases[#, #2, 1] &,
+  listAll,
+  DeleteDuplicates[Join@@{listsToRemove}]
+]
+ClearAll[IsFieldString];
+IsFieldString[s_String]:=MemberQ[{"\[Phi]","\[Psi]","F+","F-","A"},s];
 
 
-(*WeylOp2spinorObj[op_] := Module[{oplist = Prod2List[op], dict, IndexSymbol2Int, fun},*)
-(*  dict = {*)
-(*    Subscript[Subscript[SuperPlus["\[Psi]"], n_], i_] :> {n, 1 / 2, i},*)
-(*    Subscript[Subscript[SuperMinus["\[Psi]"], n_], i_] :> {n, -1 / 2, i},*)
-(*    Subscript[Subscript["D", n_], i_] :> {"D", n, i},*)
-(*    Subscript[Subscript["A", n_], i_] :> {"A", n, i},*)
-(*    Subscript[Superscript["\[Sigma]", LI_], List[S1_, S2_]] :> {"\[Sigma]", LI, S1, S2},*)
-(*    Subscript[Superscript[OverBar["\[Sigma]"], LI_], List[S1_, S2_]] :> {"\[Sigma]Bar", LI, S1, S2},*)
-(*    Subscript[Superscript["\[Sigma]", {L1_, L2_}], List[S1_, S2_]] :> {"\[Sigma]", L1, L2, S1, S2},*)
-(*    Subscript[Superscript[OverBar["\[Sigma]"], {L1_, L2_}], List[S1_, S2_]] :> {"\[Sigma]Bar", L1, L2, S1, S2},*)
-(*    Subscript[Subscript[SuperPlus["F"], n_], {i_, j_}] :> {"F+", n, i, j},*)
-(*    Subscript[Subscript[SuperMinus["F"], n_], {i_, j_}] :> {"F-", n, i, j},*)
-(*    Subscript["\[Phi]", i_] :> {"\[Phi]", i},*)
-(*    "Tr" -> {"Tr"}*)
-(*  };*)
-(*  IndexSymbol2Int[head_String, sym_List] := IndexSymbol2Int[head] /@ sym;*)
-(*  IndexSymbol2Int[head_String] := IndexSymbol2Int[head, #]&;*)
-(*  IndexSymbol2Int[head_String, sym_] :=*)
-(*      If[StringMatchQ[ToString@sym, head ~~ _],*)
-(*        ToExpression@StringReplace[ToString@sym, head ~~ i_ -> i],*)
-(*        sym*)
-(*      ];*)
-(*  fun = Flatten @ IndexSymbol2Int["SI"] @ IndexSymbol2Int["LI"] @ (# /. dict)&;*)
-(*  (fun /@ oplist) // Return;*)
-(*];*)
+(* ::Subsection:: *)
+(*Ds & Label gen*)
 
-(*Example: Dot@@(ConstructOpInSpinIndex[#,5]/.spinorObj2Op)&/@ConstructAmp[{1,1,1/2,1/2,0},10,antispinor->{0,1,0,1,0}]*)
-ClearAll[sortSpinorIndex];
-Options[sortSpinorIndex] = {factor -> False, traceLabel -> True};
-sortSpinorIndex[spinorObjsList_List, np_Integer, OptionsPattern[]] := Module[{},
-  spinorObjs = spinorObjsList[[1 ;; -2]];
-  fields = Cases[spinorObjs, {Except["D"], i_Integer, ___}];
-  spinorFields = Cases[spinorObjs, {i_Integer, ___}];
-  divs = Sort /@ GroupBy[Cases[spinorObjs, {"D", ___}], #[[2]] &];
-  sigmas = Cases[spinorObjs, {"\[Sigma]Bar" | "\[Sigma]", ___}];
-  SpinorIndices[sigmas_List] :=
-      Flatten@sigmas // DeleteDuplicates //
-          Select[StringMatchQ["SI" ~~ _][ToString@#] &];
-  allSI = SpinorIndices[sigmas];
-  spinorSI = SpinorIndices[spinorFields];
-  allSISorted = spinorSI ~ Join ~ Complement[allSI, spinorSI];
-  (*Form sigma chain*)
-  AnotherSI[ind_][obj_] :=
-      If[MemberQ[obj, ind],
-        Complement[Intersection[obj, allSI], {ind}][[1]], Null];
-  leftSigmas = sigmas;
-  collected = <||>;
-  alreadyDone = {};
-  Do[(*two pointer*)
-    head = SelectFirst[leftSigmas, MemberQ[#, ptr1] &, Null];
-    If[head === Null, Continue[]];
-    collected[ptr1] = {head};
-    ptr2 = AnotherSI[ptr1][head];
-    leftSigmas = DeleteCases[leftSigmas, head];
-    While[ptr2 =!= ptr1,
-      head = SelectFirst[leftSigmas, MemberQ[#, ptr2] &, Null];
-      If[head === Null, Break[]];
-      AppendTo[collected[ptr1], head];
-      leftSigmas = DeleteCases[leftSigmas, head];
-      ptr2 = AnotherSI[ptr2][head];];
 
-    If[ptr2 === ptr1, AppendTo[collected[ptr1], "circle"],
-      If[! MemberQ[alreadyDone, ptr2],
-        AppendTo[collected[ptr1], ptr2];, (*chain of head:
-     prt2 is in middle term*)
-        If[collected[ptr2] =!= {}, ptr3 = collected[ptr2][[-1]],
-          Do[If[Length@collected[k] > 1 && collected[k][[-1]] === ptr2,
-            ptr3 = k; Break[]], {k, allSI}]];
-        Assert[ptr3 =!= "circle",
-          "Sigma contraction: middle point 2 not in chain"];
-        collected[ptr3] =
-            Join[If[collected[ptr2] =!= {},
-              Reverse[collected[ptr2][[;; -2]]], {}],
-              Reverse[collected[ptr1]], {ptr1}];
-        collected[ptr1] = {};
-        collected[ptr2] = {};];];
-    AppendTo[alreadyDone, ptr1];, {ptr1, allSISorted}];
-  Assert[Length@leftSigmas === 0, "Sigma contraction: left sigma!"];
-  collected = collected // DeleteCases[{}];
-  (*Form operator chain*)sigmaTr = {};
-  sigmaChain = {};
-  opChain = {};
-  Do[If[collected[k][[-1]] == "circle",
-    AppendTo[sigmaTr, {{"Tr"}} ~ Join ~ collected[k][[;; -2]]];
-    Continue[];];
-  leftPsi = SelectFirst[spinorFields, MemberQ[k], Null];
-  rightPsi =
-      SelectFirst[spinorFields, MemberQ[collected[k][[-1]]], Null];
-  Assert[leftPsi =!= Null && rightPsi =!= Null,
-    "Sigma contraction: find no psi!"];
-  spinorFields = DeleteCases[spinorFields, leftPsi];
-  spinorFields = DeleteCases[spinorFields, rightPsi];
-  AppendTo[sigmaChain,
-    Join[{leftPsi}, collected[k][[;; -2]], {rightPsi}]];, {k,
-    Keys@collected}];
-  spinorFields = SortBy[spinorFields, #[[3]] &];
+ClearAll@GetIndiceGen;
+GetIndiceGen[label_String:""]:=Module[{a=1,Gen},Gen[]:=Symbol[label<>"$"<>ToString[a++]];
+Return[Gen];]
+ClearAll@DtranslateAll;
+DtranslateAll[Lorgen_][psiChains_List]:=Module[{circledChains,circledWithDs,filteredChains,reChains,others,GetGenDInChain,genfun,chainsWithDs,allDs},
+GetGenDInChain[start_]:=Module[{s,Gen},
+s=Switch[start,ab,0,sb,1,_,Print["error GetGenDInChain"];Abort[]];
+Gen[n_]:=Module[{lor=Lorgen[]},{{"D",n,lor},{If[EvenQ[s++],"\[Sigma]","\[Sigma]Bar"],lor}}];
+Return[Gen];];
 
-  opChain =
-      Join[fields, spinorFields, Join @@ sigmaChain, Join @@ sigmaTr];
-  (*Insert Divs*)
-  Do[pos = FirstPosition[opChain,
-    {Except["D"], k, ___} | {k, 1 / 2 | -1 / 2 | I / 2 | -I / 2, _},
-    0];
-  Assert[pos != 0, "Sigma contraction: find no field!"];
-  opChain = Insert[opChain, Splice@divs[k], pos];, {k, Keys@divs}];
-  (*Todo fix factor*)
-  If[OptionValue@factor, AppendTo[opChain, 1]];
-  Return[opChain];
-];
+circledChains=Cases[psiChains,{"circle",__}];
+circledWithDs=Table[genfun=GetGenDInChain[ab];
+Join[{{"Tr"}},chain/.{{"circle",ds__}:>{Sequence@@Flatten[genfun/@{ds},1]}}],{chain,circledChains}];
+filteredChains=Select[psiChains,Count[#,_Integer]>2&];
+others=ComplementMultiSet[psiChains,filteredChains,circledChains];
+chainsWithDs=Table[genfun=GetGenDInChain[chain[[1]]];
+chain/.{{hL_,i_,ds__,j_,hR_}:>{hL,i,Sequence@@Flatten[genfun/@{ds},1],j,hR}},{chain,filteredChains}];
+reChains=Join[chainsWithDs,circledWithDs];
+allDs=Cases[reChains,{"D",n_,lor_},Infinity]//SortBy[#[[2]]&];
+Join[reChains/.{"D",n_,lor_}:>Sequence[],others,allDs]];
 
-Options[ConstructOpInSpinIndexSort] = {mass -> All, factor -> False, traceLabel -> True,
-  color -> False, youngTableaux -> {}, ptclColorIndexs -> <||>, FCSimplify -> False, EpsSimplify -> True,
-  GluonColorIndex -> True} ;
-(*TODO BUG:what should it do if !OptionValue@traceLabel (pass OptionValue@traceLabel to sortSpinorIndex)*)
-ConstructOpInSpinIndexSort[amp_, np_Integer, opts : OptionsPattern[]] :=
-    Module[{opList},
-      If[OptionValue@traceLabel == True,
-        opList = sortSpinorIndex[ConstructOpInSpinIndex[amp, np, Sequence @@ FilterRules[{opts}, Options[ConstructOpInSpinIndex]]],
-          np, Sequence @@ FilterRules[{opts}, Options[sortSpinorIndex]]];
-        If[OptionValue@color == True,
-          Return[ConstructOpInSpinIndexSortColorDLC[opList, np, OptionValue@youngTableaux, OptionValue@ptclColorIndexs, FCSimplify -> OptionValue@FCSimplify, EpsSimplify -> OptionValue@EpsSimplify, GluonColorIndex -> OptionValue@GluonColorIndex ]];
-        ];
-      ];
-      Return[opList]
-    ];
 
-(*Example: (ConstructOpInSpinIndexSort[#,5])&/@{ConstructAmp[{1,1,1/2,1/2,0},10,antispinor->{0,1,0,1,0}][[8]]}*)
+(* ::Subsection:: *)
+(*Append Field & Phi*)
 
-(*this only works for N * 3 Young Tableaux to N structure constants*)
-youngTableaux2StrConst[yt_] :=
-    Module[{corInd, outList},
-      corInd[cor_] := Symbol["CI" <> ToString[cor]];
-      outList = {};
-      Do[
-        AppendTo[outList, {"\[Epsilon]i", corInd[yt[[1, i]]], corInd[yt[[2, i]]], corInd[yt[[3, i]]]}]
-        , {i, Length[yt[[1]]]}];
-      Return[outList]
-    ];
 
-(*In ConstructOpInSpinIndexSortColorDLC, "\[Epsilon]i" and fermion spin 1/2 I label the anti fund rep for epsilon and antiquark*)
-Options[ConstructOpInSpinIndexSortColorDLC] = {FCSimplify -> False, EpsSimplify -> True, GluonColorIndex -> True};
-ConstructOpInSpinIndexSortColorDLC[opList_, np_Integer, yt_, ptclColorIndexs_, OptionsPattern[]] :=
-    Module[{dummyIndexN, corInd, curPtcl, curPtclInv, curIndex, op},
-      op = opList;
-      dummyIndexN = Evaluate[Max[Flatten[yt]] + 1];
-      corInd[cor_] := Symbol["CI" <> ToString[cor]];
-      Do[curPtcl = Keys[ptclColorIndexs][[i]];
-      curPtclInv = -curPtcl + 2 * np + 1;
-      curIndex = ptclColorIndexs[curPtcl];
-      Which[Length[curIndex] == 1,
-        op =
-            op /. {{curPtcl, 1 / 2, i_} :> {curPtcl, 1 / 2, i, corInd[curIndex[[1]]]},
-              {curPtclInv, 1 / 2, i_} :> {-curPtcl + 2 * np + 1, 1 / 2, i, corInd[curIndex[[1]]]},
-              {curPtcl, -1 / 2, i_} :> {curPtcl, -1 / 2, i, corInd[curIndex[[1]]]},
-              {curPtclInv, -1 / 2, i_} :> {-curPtcl + 2 * np + 1, -1 / 2, i, corInd[curIndex[[1]]]}},
-        Length[curIndex] == 2,
-        op =
-            op /. {{curPtcl, -1 / 2, i_} :> {curPtcl, -1 / 2 I, i, corInd[dummyIndexN]},
-              {curPtclInv, -1 / 2, i_} :> {curPtcl, -1 / 2 I, i, corInd[dummyIndexN]},
-              {curPtcl, 1 / 2, i_} :> {curPtcl, 1 / 2 I, i, corInd[dummyIndexN]},
-              {curPtclInv, 1 / 2, i_} :> {curPtcl, 1 / 2 I, i, corInd[dummyIndexN]}};
-        op =
-            Insert[
-              op, {"\[Epsilon]", corInd[curIndex[[1]]], corInd[curIndex[[2]]], corInd[dummyIndexN++]},
-              Join[Position[op, {curPtcl, ___}], Position[op, {curPtclInv, ___}]]],
-        Length[curIndex] == 3,
-        If[OptionValue@GluonColorIndex == False,
-          op =
-              op /. {{"F-", curPtcl, i_, j_} :> {"F-", curPtcl, i, j, corInd[dummyIndexN + 1]},
-                {"F-", curPtclInv, i_, j_} :> {"F-", curPtclInv, i, j, corInd[dummyIndexN + 1]},
-                {"F+", curPtclInv, i_, j_} :> {"F+", curPtclInv, i, j, corInd[dummyIndexN + 1]},
-                {"F+", curPtcl, i_, j_} :> {"F+", curPtcl, i, j, corInd[dummyIndexN + 1]},
-                {"A", curPtcl, i_} :> {"A", curPtcl, i, corInd[dummyIndexN + 1]},
-                {"A", curPtclInv, i_} :> {"A", curPtclInv, i, corInd[dummyIndexN + 1]}};
-          op =
-              Insert[
-                op, {"\[Epsilon]", corInd[dummyIndexN], corInd[curIndex[[1]]], corInd[curIndex[[3]]]},
-                Join[
-                  Position[op, {"F+", curPtclInv, ___}],
-                  Position[op, {"F-", curPtcl, ___}],
-                  Position[op, {"A", curPtcl, ___}],
-                  Position[op, {"A", curPtclInv, ___}]]];
-          op =
-              Insert[
-                op, {"TF", corInd[dummyIndexN + 1], corInd[dummyIndexN++], corInd[curIndex[[2]]]},
-                Join[
-                  Position[op, {"F+", curPtclInv, ___}],
-                  Position[op, {"F-", curPtcl, ___}],
-                  Position[op, {"A", curPtcl, ___}],
-                  Position[op, {"A", curPtclInv, ___}]]];
-          dummyIndexN++,
-          op =
-              op /. {{"F-", curPtcl, i_, j_} :> {"F-", curPtcl, i, j, corInd[dummyIndexN], corInd[curIndex[[2]]]},
-                {"F-", curPtclInv, i_, j_} :> {"F-", curPtclInv, i, j, corInd[dummyIndexN], corInd[curIndex[[2]]]},
-                {"F+", curPtclInv, i_, j_} :> {"F+", curPtclInv, i, j, corInd[dummyIndexN], corInd[curIndex[[2]]]},
-                {"F+", curPtcl, i_, j_} :> {"F+", curPtcl, i, j, corInd[dummyIndexN], corInd[curIndex[[2]]]},
-                {"A", curPtcl, i_} :> {"A", curPtcl, i, corInd[dummyIndexN], corInd[curIndex[[2]]]},
-                {"A", curPtclInv, i_} :> {"A", curPtclInv, i, corInd[dummyIndexN], corInd[curIndex[[2]]]}};
-          op =
-              Insert[
-                op, {"\[Epsilon]", corInd[dummyIndexN++], corInd[curIndex[[1]]], corInd[curIndex[[3]]]},
-                Join[
-                  Position[op, {"F+", curPtclInv, ___}],
-                  Position[op, {"F+", curPtcl, ___}],
-                  Position[op, {"F-", curPtcl, ___}],
-                  Position[op, {"F-", curPtclInv, ___}],
-                  Position[op, {"A", curPtcl, ___}],
-                  Position[op, {"A", curPtclInv, ___}]]];
+(* ::Text:: *)
+(*insert field assuming the spin of particle n match the fomula.*)
 
-        ]
-      ]
-        , {i, Length[Keys[ptclColorIndexs]]}];
-      op = Join[youngTableaux2StrConst[yt], op];
-      Which[
-        OptionValue@FCSimplify == True,
-        Return[ColorSimplify[op]],
-        OptionValue@EpsSimplify == True,
-        Return[op // EpsilonListSimplify // RearrangeIndex["CI"]]
-      ];
-      Return[op]
-    ];
 
-ColorSimplify[opList_List] :=
-    Module[{EpsilonList, outList, lambdaList, curItem},
-      EpsilonList = {};
-      outList = {};
-      lambdaList = {};
-      Do[
-        curItem = opList[[i]];
-        Which[curItem[[1]] == "\[Epsilon]" || curItem[[1]] == "\[Epsilon]i",
-          AppendTo[EpsilonList, curItem],
-          curItem[[1]] == "TF",
-          AppendTo[lambdaList, curItem],
-          curItem[[1]] != "\[Epsilon]" && curItem[[1]] != "\[Epsilon]i" && curItem[[1]] != "\[Epsilon]",
-          AppendTo[outList, curItem]
-        ]
-        , {i, Length[opList]}];
-      EpsilonList = EpsilonList /. {{"\[Epsilon]", i_, j_, k_} :> CLC[i, j, k], {"\[Epsilon]i", i_, j_, k_} :> CLC[i, j, k]};
-      EpsilonList = (Times @@ EpsilonList) // Contract;
-      EpsilonList = EpsilonList /. {CartesianIndex[i_] :> i, CartesianPair -> SUNFDelta};
-      If[Length[lambdaList] != 0,
-        lambdaList = lambdaList /. {"TF", i_, j_, k_} :> SUNTF[i, j, k];
-        lambdaList = ((EpsilonList * Times @@ lambdaList ) // SUNFSimplify) /. {SUNTrace[i_, Explicit -> False] :> SUNTrace[i, Explicit -> True]} // SUNFSimplify // SUNSimplify // FCE;
-        Return[Join[{lambdaList}, outList]],
-        Return[Join[{EpsilonList}, outList]]
-      ]
+ClearAll[TranslateAppendField, TranslatePhi];
+TranslateAppendField[fieldObj_List, n_Integer, chain_List] := Module[{dpos},
+   dpos = Flatten@Position[chain, {"D", n, ___}];
+   If[Length@dpos == 0, Return[Insert[chain, fieldObj, -1]]];
+   Insert[chain, fieldObj, dpos[[-1]] + 1]
+   ];
+TranslatePhi[n_Integer][chain_List] := TranslateAppendField[{"\[Phi]", n}, n, chain];
 
-    ];
 
-(*This funtion applies delta to operator, works NOT on polynomial *)
-ColorDeltaApply[deltaListTimes_, opList_] :=
-    Module[{deltaList, ruleList},
-      ruleList = {};
-      deltaList = List @@ deltaListTimes;
-      Do[If[Head[deltaList[[i]]] == SUNFDelta,
-        AppendTo[ruleList, Rule @@ deltaList[[i]]]
-      ]
-        , {i, Length[deltaList]}];
-      opList /. ruleList
-    ];
+(* ::Subsection:: *)
+(*Psi*)
 
-ColorDeltaApply[opList_] := ColorDeltaApply[opList[[1]], opList[[2 ;;]]];
 
-(*Example: ConstructOpInSpinIndexSort[sb[3, 7]^2 sb[4, 8]^2, 4, FCSimplify -> True, color -> True,
-   youngTableaux -> {{1, 2}, {3, 4}, {5, 6}}, ptclColorIndexs -> <|3 -> {1, 2, 3}, 4 -> {4, 5, 6}|>,
-   mass -> {1, 2}] // ColorDeltaApply // RearrangeIndex["CI"]*)
-
-ColorOpReduce[expr_] := expr //. {
-  EpsColor[a_, b_, c_] * EpsColor[a_, b_, d_] :> DeltaColor[c, d],
-  DeltaColor[a_, b_] * DeltaColor[a_, c_] :> DeltaColor[b, c],
-  DeltaColor[a_, b_] * DeltaColor[a_, b_] :> 1
+ClearAll[TranslatePsi];
+TranslatePsi[n_Integer][chain_List]:= 
+chain/. {{ab,n,o___}:>{{"\[Psi]",n,ab},o},{sb,n,o___}:>{{"\[Psi]",n,sb},o},{o___,n,ab}:>{o,{"\[Psi]",n,ab}},{o___,n,sb}:>{o,{"\[Psi]",n,sb}}
 };
-DeltaColor[i_, j_] /; i === j := 0;
-SetAttributes[EpsColor, Orderless];
-SetAttributes[DeltaColor, Orderless];
 
-EpsilonListSimplify[opList_List] := Module[
-  {epsPosList, epsExprList, epsList, epsExpr, deltaList, deltaReplaceList, canceledEpsPos},
-  epsPosList = Position[opList, {"\[Epsilon]" | "\[Epsilon]i", ___}, 1];
-  If[Length@epsPosList == 0, Return[opList]];
-  epsExprList = opList[[Flatten@epsPosList]] /. {
-    {"\[Epsilon]", i_, j_, k_} :> EpsColor[i, j, k],
-    {"\[Epsilon]i", i_, j_, k_} :> EpsColor[i, j, k]};
-  epsExpr = Times @@ epsExprList // ColorOpReduce;
-  epsList = Prod2List @ epsExpr;
-  deltaList = Select[epsList, (Head@# === DeltaColor) &];
-  epsList = Complement[epsList, deltaList];
-  deltaReplaceList = deltaList /. (DeltaColor[i_, j_] :> (i -> j));
-  canceledEpsPos = epsPosList[[Flatten@
-      Position[epsExprList, e_EpsColor /; ! MemberQ[epsList, e], 1]]];
-  Return[Delete[opList, canceledEpsPos] /. deltaReplaceList];
+
+(* ::Subsection:: *)
+(*PsiChain Operate Fun*)
+
+
+(* ::Subsubsection:: *)
+(*ReversePsiChain*)
+
+
+ClearAll@ReversePsiChain;
+ReversePsiChain[chain_List] := Reverse[chain /. {"\[Sigma]" -> "\[Sigma]Bar", "\[Sigma]Bar" -> "\[Sigma]"}];
+
+
+(* ::Subsubsection:: *)
+(*ChainToCircle*)
+
+
+(* ::Text:: *)
+(*Assuming chain can be glued as circle. i,j will be indices in sigma or sigmabar*)
+(*return as {new chain objs, used indices list, sigma/sigmabar/None}*)
+
+
+ClearAll[ChainToCircleSame,ChainToCircleFlip];
+ChainToCircleSame[Lorgen_][chain_List,n_Integer] := Module[{test,extra, others, flag, i, j},
+test=Length@chain>4&&chain[[;;2]]===chain[[{-1,-2}]]&&chain[[2]]==n;
+  If[!test, Return[{chain, {}, None}]];
+  i = Lorgen[];
+  j = Lorgen[];
+  flag = Switch[chain[[1]], ab, "\[Sigma]", sb, "\[Sigma]Bar", _, Print["error ChainToCircle: mismatched chain head", chain[[1]]]; Abort[]];
+  extra = {flag, i, j};
+  others = chain[[3 ;; -3]];
+  others = Switch[Length@others, 0, {}, 1, {others[[1]]}, _, others];
+  Return@{{{"Tr"},extra, Sequence @@ others}, {i, j}, flag};
+  ];
+ChainToCircleFlip[Lorgen_][chain_List,n_Integer] := Module[{test, extra, others,flag, i},
+  test=Length@chain>4
+  &&chain[[2]]===chain[[-2]]&&chain[[2]]==n
+  &&Length@Complement[{ab,sb},{chain[[1]],chain[[-1]]}]==0;
+  If[!test, Return[{chain, {}, None}]];
+  i = Lorgen[]; 
+  flag = Switch[chain[[-1]], ab, "\[Sigma]", sb, "\[Sigma]Bar", _, Print["error ChainToCircle: mismatched chain head", chain[[1]]]; Abort[]];
+  extra = {flag, i};
+  others = chain[[3 ;; -3]];
+  others = Switch[Length@others, 0, {}, 1, {others[[1]]}, _, others];
+  Return@{{{"Tr"},extra, Sequence @@ others}, {i}, flag};
+  ];
+
+
+(* ::Subsubsection:: *)
+(*ChainGlued *)
+
+
+ClearAll@ChainGluedSame;
+ChainGluedSame[Lorgen_][chainA_List, chainB_List, n_] := Module[{chainA2, chainB2, flag,i, j, aL, aR, bL, bR, gl, dealFun, extra},
+   aL = chainA[[;; 2]];
+   aR = chainA[[{-1, -2}]];
+   bL = chainB[[;; 2]];
+   bR = chainB[[{-1, -2}]];  
+   dealFun["aL==bL"] := Block[{},
+     gl = aL[[1]];
+     chainA2 = ReversePsiChain@chainA[[3 ;;]];
+     chainB2 = chainB[[3 ;;]];  
+     ];
+   dealFun["aL==bR"] := Block[{},
+     gl = aL[[1]];
+     chainA2 = chainB[[;; -3]];
+     chainB2 = chainA[[3 ;;]];
+     ];
+   dealFun["aR==bL"] := Block[{},
+     gl = aR[[1]];
+     chainA2 = chainA[[;; -3]];
+     chainB2 = chainB[[3 ;;]];
+     ];
+   dealFun["aR==bR"] := Block[{},
+     gl = aR[[1]]; 
+     chainA2 = chainA[[;; -3]];
+     chainB2 = ReversePsiChain@chainB[[;; -3]];
+     ];
+   Which[
+    aL === bL && aL[[2]] == n, dealFun["aL==bL"],
+    aL === bR && aL[[2]] == n, dealFun["aL==bR"],
+    aR === bL && aR[[2]] == n, dealFun["aR==bL"],
+    aR === bR && aR[[2]] == n, dealFun["aR==bR"],
+    True, Return[{{chainA, chainB}, {}, None}];];
+   i = Lorgen[];
+   j = Lorgen[];
+   flag = Switch[gl, ab, "\[Sigma]", sb, "\[Sigma]Bar", _, Print["error ChainGluedSame: mismatched chain head:", gl,"at:\n",chainA,"\nand\n",chainB]; Abort[]];
+   extra = {flag, i, j};
+   chainA2 = Switch[Length@chainA2, 0, {}, 1, {chainA2[[1]]}, _, chainA2];
+   chainB2 = Switch[Length@chainB2, 0, {}, 1, {chainB2[[1]]}, _, chainB2];
+   Return@{{Sequence @@ chainA2, extra, Sequence @@ chainB2}, {i, j}, flag}
+   ];
+   
+ClearAll@ChainGluedFlip;
+ChainGluedFlip[Lorgen_][chainA_List, chainB_List, n_] := Module[{chainA2, chainB2,flag,CheckConnectAble, i,  aL, aR, bL, bR, gl, dealFun, extra},
+   aL = chainA[[;; 2]];
+   aR = chainA[[{-1, -2}]];
+   bL = chainB[[;; 2]];
+   bR = chainB[[{-1, -2}]];  
+   CheckConnectAble[{lH_,ln_},{rH_,rn_}]:=ln==n&&rn==n&&Length@Complement[{ab,sb},{lH,rH}]==0;
+   dealFun["aL&bL"] := Block[{},
+     gl = {aL[[1]],bL[[1]]};
+     chainA2 = ReversePsiChain@chainA[[3 ;;]];
+     chainB2 = chainB[[3 ;;]];
+     ];
+   dealFun["aL&bR"] := Block[{},
+     gl = {aL[[1]],bR[[1]]};
+     chainA2 = chainB[[;; -3]];
+     chainB2 = chainA[[3 ;;]];
+     ];
+   dealFun["aR&bL"] := Block[{},
+      gl = {aR[[1]],bL[[1]]};
+     chainA2 = chainA[[;; -3]];
+     chainB2 = chainB[[3 ;;]];
+     ];
+   dealFun["aR&bR"] := Block[{},
+      gl = {aR[[1]],bR[[1]]};
+     chainA2 = chainA[[;; -3]];
+     chainB2 = ReversePsiChain@chainB[[;; -3]];
+     ];
+   Which[
+    CheckConnectAble[aL,bL], dealFun["aL&bL"],
+    CheckConnectAble[aL,bR], dealFun["aL&bR"],
+    CheckConnectAble[aR,bL], dealFun["aR&bL"],
+    CheckConnectAble[aR,bR], dealFun["aR&bR"],
+    True, Return[{{chainA, chainB}, {}, None}];];
+   i = Lorgen[];
+   flag = Switch[gl, {ab,sb}, "\[Sigma]", {sb,ab}, "\[Sigma]Bar", _, Print["error ChainGluedFlip: mismatched chain head:", gl,"at:\n",chainA,"\nand\n",chainB];  Abort[]];
+   extra = {flag, i};
+   chainA2 = Switch[Length@chainA2, 0, {}, 1, {chainA2[[1]]}, _, chainA2];
+   chainB2 = Switch[Length@chainB2, 0, {}, 1, {chainB2[[1]]}, _, chainB2];
+   Return@{{Sequence @@ chainA2, extra, Sequence @@ chainB2}, {i}, flag}
+   ];
+
+
+(* ::Subsection:: *)
+(*Vector 1*)
+
+
+(* ::Code::Initialization::"Tags"-><|"UppercaseVariable" -> <||>, "UppercasePattern" -> <||>|>:: *)
+ClearAll[TranslateVector];
+TranslateVector[Lorgen_,n_Integer][chains_List]:=Module[{relatedChains,circleTest,otherChains,DealWithChains,DealWithCircle,changedChain,rulesDealField,appendedFieldObj},
+(*classify chains*)
+relatedChains=Cases[chains,({hL_,n,___}/;MemberQ[{ab,sb},hL])|({___,n,hR_}/;MemberQ[{ab,sb},hR])];
+otherChains=ComplementMultiSet[chains,relatedChains];
+(*1chain indicate circle, 2 indicate 2chains, others wrong*)
+circleTest=Switch[Length@relatedChains,1,True,2,False,_,Print["error TranslateVector:mismatched wave function spinors"];Abort[]];
+(*def two cases*)
+DealWithCircle[]:=Module[{temp1},
+temp1=ChainToCircleSame[Lorgen][relatedChains[[1]],n];
+If[Length@temp1[[2]]==0,temp1=ChainToCircleFlip[Lorgen][relatedChains[[1]],n];];
+If[Length@temp1[[2]]==0,Print["error TranslateVector:at ",n," for:\n",chains];Abort[]];
+changedChain=temp1[[1]];
+appendedFieldObj=temp1[[{2,3}]];
+];
+DealWithChains[]:=Module[{temp1},
+temp1=ChainGluedSame[Lorgen][relatedChains[[1]],relatedChains[[2]],n];
+If[Length@temp1[[2]]==0,
+temp1=ChainGluedFlip[Lorgen][relatedChains[[1]],relatedChains[[2]],n];];
+If[Length@temp1[[2]]==0,Print["error TranslateVector:at ",n," for:\n",chains];Abort[]];
+changedChain=temp1[[1]];
+appendedFieldObj=temp1[[{2,3}]];
+];
+(*exec*)
+If[circleTest,DealWithCircle[],DealWithChains[]];
+rulesDealField={
+{{i_,j_},"\[Sigma]"}:>{"F-",n,i,j},
+{{i_,j_},"\[Sigma]Bar"}:>{"F+",n,i,j},
+{{i_},"\[Sigma]"|"\[Sigma]Bar"}:>{"A",n,i}};
+appendedFieldObj = appendedFieldObj /.rulesDealField;
+TranslateAppendField[appendedFieldObj,n,Join[{changedChain},otherChains]]
 ];
 
-RearrangeIndex[indexHead_String] := RearrangeIndex[#, indexHead]&;
-RearrangeIndex[opList_List, indexHead_String] := Module[
-  {headLength = StringLength@indexHead, TestIndexHead, allIndices, indicesReplaceRules},
-  TestIndexHead[expr_] := If[StringLength@ToString@expr <= headLength,
-    False,
-    StringTake[#, headLength]&@ToString@expr === indexHead];
-  allIndices = Flatten@opList // Select[TestIndexHead];
-  allIndices = allIndices // DeleteDuplicates
-      // SortBy[(ToExpression@Last@StringSplit[ToString@#, indexHead])&];
-  indicesReplaceRules = Table[
-    allIndices[[i]] -> Symbol[indexHead <> ToString@i]
-    , {i, Length@allIndices}];
-  Return[opList /. indicesReplaceRules];
-];
 
-SpinorObj2FeynCalField[opListIn_] :=
-    Module[
-      {
-        opList, dic, curObj, outList, trList, corIndex, corInN
-      },
-      corInN = 1;
-      corIndex[n_] := Module[{}, corInN++; Symbol["COR" <> ToString[n]]];
-      dic = {
-        {n_Integer, 1 / 2, i_} :> QuantumField[QuarkField],
-        {n_Integer, -(1 / 2), i_} :> QuantumField[QuarkField],
-        {n_Integer, 1 / 2 I , i_} :> QuantumField[AntiQuarkField],
-        {n_Integer, -(1 / 2) I, i_} :> QuantumField[AntiQuarkField],
-        {"D", n_, i_} :> CovariantD[i],
-        {"A", n_, i_} :> QuantumField[GaugeField, {i}, {corIndex[corInN]}], (*CovariantD[i]*)
-        {"\[Sigma]", LI_, S1_, S2_} :> GA[LI],
-        {"\[Sigma]Bar", LI_, S1_, S2_} :> GA[LI],
-        {"\[Sigma]", L1_, L2_, S1_, S2_} :> 1 / 2 I (GA[L1].GA[L2] - GA[L2].GA[L1]),
-        {"\[Sigma]Bar", L1_, L2_, S1_, S2_} :> 1 / 2 I (GA[L1].GA[L2] - GA[L2].GA[L1]),
-        {"F+", n_, i_, j_} :> FieldStrength[i, j, corIndex[corInN]], (*FieldStrength[i,j,c]+LC[i,j,k,l].FieldStrength[k,l,c]*)
-        {"F-", n_, i_, j_} :> FieldStrength[i, j, corIndex[corInN]],
-        {"F+", n_, i_, j_, c_} :> FieldStrength[i, j, c],
-        {"F-", n_, i_, j_, c_} :> FieldStrength[i, j, c],
-        {"f", i_, j_, k_} :> SUNF[i, j, k],
-        {"TF", i_, j_, k_} :> SUNTF[i, j, k],
-        {"\[Epsilon]", i_, j_, k_} :> Eps[i, j, k],
-        {"\[Epsilon]i", i_, j_, k_} :> Eps[i, j, k],
-        {"\[Phi]", i_} :> QuantumField[\[Phi]]}; (*===TODO===Need to change for id ptcl===TODO===*)
-      outList = {};
-      curObj = opListIn[[1]];
-      opList = Drop[opListIn, 1];
-      While[curObj != {"Tr"},
-        AppendTo[outList, curObj /. dic];
-        If[Length[opList] == 0, Return[outList]];
-        curObj = opList[[1]];
-        opList = Drop[opList, 1];
+(* ::Subsection:: *)
+(*Gravitino 3/2  *)
+
+
+ClearAll[TranslateGravitino];
+TranslateGravitino[Lorgen_, n_Integer][chains_List] := Module[{
+  isLongMode, relatedChains, circleTest, otherChains, remainChains, chainsForConnect, fieldType, 
+  ClassifyChains, DealWithChain, DealWithCircle, changedChain, appendedInd, reChains},
+  (*classify chains*)
+  relatedChains = Cases[chains, ({hL_, n, ___} /; MemberQ[{ab, sb}, hL]) | ({___, n, hR_} /; MemberQ[{ab, sb}, hR])];
+  otherChains = ComplementMultiSet[chains, relatedChains];
+  (*2chain indicate circle+line, 3 indicate Y type, others wrong*)
+  circleTest = Switch[Length@relatedChains, 2, True, 3, False, _, Print["error TranslateGravitino::at ", n, " circleTest mismatched wave function spinors"]; Abort[]];
+  (*ab3->3 ab2sb1->2 ab1sb2->1 ab0sb3->0*)
+  fieldType = Count[relatedChains, {ab, n, ___}] + Count[relatedChains, {___, n, ab} ];
+  (* Print["relatedChains", relatedChains]; *)
+  (* Print["fieldType", fieldType]; *)
+  isLongMode = Switch[fieldType, 0|3, False, 1|2, True, _, Print["error TranslateGravitino::at ", n, " ab|sb count illegal"]; Abort[] ];
+  (*For 3|0 we have 2 cases:
+    a -- a, a -- o.
+    a--o, a--o, a--o.
+    For 2|1 we have 3 cases:
+    a -- s, a -- o.
+    a -- a, s -- o.
+    a -- o, a -- o, s -- o.
+  *)
+  ClassifyChains[] := Module[{ah, sh, tempAX, tempSO, tempAS},
+    ah = Switch[fieldType, 2|3, ab, 1|0, sb];
+    sh = Switch[fieldType, 2|3, sb, 1|0, ab];
+    Switch[fieldType, 
+    3|0, 
+    (*2 cases*)
+    If[
+
+        circleTest,
+
+        (*a -- a, a -- o.*)
+        chainsForConnect = Cases[relatedChains, {ah, n, ___, n, ah}];
+        remainChains = If[chainsForConnect[[1]] === First@relatedChains, {Last@relatedChains}, {First@relatedChains}];
+        ,
+
+        (*a--o, a--o, a--o.*)
+        tempAX = SortBy[Length]@relatedChains;
+        chainsForConnect = tempAX[[{1,2}]];
+        remainChains = {tempAX[[3]]}
+      ],
+    2|1,
+    (*3 cases*)
+    (*maybe a -- s or a -- a or a--o *)
+    tempAX = SortBy[Length]@Cases[relatedChains, {ah, n, ___} | {___,n, ah} ]; 
+    (*only a -- s*)
+    tempAS = Cases[tempAX, {sh, n, ___} | {___,n, sh} ];  
+    (*only s -- o*)
+    tempSO = ComplementMultiSet[relatedChains, tempAX];
+    Which[
+      (*a -- o, a -- o, s -- o.*)
+      !circleTest && Length@tempSO == 1,
+      chainsForConnect = {tempSO[[1]], tempAX[[1]]};
+      remainChains = {tempAX[[2]]},
+
+      (*a -- s, a -- o.*)
+      circleTest && Length@tempAS == 1,
+      chainsForConnect = {tempAS[[1]]};
+      remainChains = If[chainsForConnect[[1]] === tempAX[[1]], {tempAX[[2]]}, {tempAX[[1]]}],
+
+      (*a -- a, s -- o.*)
+      circleTest && Length@tempSO == 1,
+      chainsForConnect = {tempSO[[1]], tempAX[[1]]};
+      remainChains = {},
+
+      (*others*)
+      _, Print["error TranslateGravitino::at ", n, " no such topological chains structure.\n", chains]; Abort[]
       ];
-      While[Length[opList] != 0,
-        trList = {};
-        curObj = opList[[1]];
-        opList = Drop[opList, 1];
-        While[curObj != {"Tr"},
-          AppendTo[trList, curObj /. dic];
-          curObj = opList[[1]];
-          opList = Drop[opList, 1];
-          If[Length[opList] == 0, AppendTo[trList, curObj /. dic];
-          Break[]]
-        ];
-        AppendTo[outList, Tr[Dot @@ trList]]
-      ];
-      outList
     ];
-(*Example: (Dot @@ ((ConstructOpInSpinIndexSort[#, 5, traceLabel -> True] & /@
-           {ConstructAmp[{1, 1, 1/2, 1/2, 0}, 10, antispinor -> {0, 1, 0, 1, 0}][[8]]})[[1]]
-           // SpinorObj2FeynCalField)) // TraditionalForm*)
+  ];
+  (*def two cases*)
+  DealWithCircle[] := Module[{circledChain, temp1},
+  (* Print["conn c", chainsForConnect]; *)
+    circledChain = chainsForConnect[[1]]; 
+    temp1 = If[isLongMode, ChainToCircleFlip, ChainToCircleSame][Lorgen][circledChain, n];
+    If[Length@temp1[[2]] == 0, Print["error TranslateGravitino:connect at ", n, " for:\n", chainsForConnect]; Abort[]]; 
+    changedChain = temp1[[1]];
+    appendedInd = temp1[[2]];
+    ];
+  DealWithChain[] := Module[{selectedMergeChains, temp1}, 
+    (* Print["conn l", chainsForConnect]; *)
+    selectedMergeChains = chainsForConnect;
+    temp1 = If[isLongMode, ChainGluedFlip ,ChainGluedSame][Lorgen][selectedMergeChains[[1]], selectedMergeChains[[2]], n]; 
+    If[Length@temp1[[2]] == 0, Print["error TranslateGravitino:connect at ", n, " for:\n", chainsForConnect]; Abort[]];
+    changedChain = temp1[[1]];
+    appendedInd = temp1[[2]];
+    ];
+  (*exec*)
+  ClassifyChains[];
+  (* Print["chainsForConnect",chainsForConnect]; *)
+  (* Print["remainChains", remainChains]; *)
+  If[Length@chainsForConnect==1, DealWithCircle[], DealWithChain[] ]; 
+  If[Length@appendedInd > 2 || Length@appendedInd < 1, Print["error TranslateGravitino:ind new at", n, " for:\n", chains]; Abort[];];
+  (* Print["changedChain", changedChain, appendedInd]; *)
+  (* Print["remainChains", remainChains]; *)
+  changedChain = Join[{changedChain}, remainChains];
+  (* Print["changedChain", changedChain]; *)
+  changedChain = TranslatePsi[n][changedChain] /. {{"\[Psi]", n, o___} :> {"\[Psi]", n, o, appendedInd[[-1]]}};
+  (* Print["changedChain", changedChain]; *)
+  reChains = Join[changedChain, otherChains];
+  (* Print["reChains", reChains]; *)
+  Return@If[
+    Length@appendedInd > 1,
+    TranslateAppendField[{"D", n, appendedInd[[1]]}, n, reChains],
+    reChains
+    ];
+  ];
 
-Options[Amp2WeylOp] = {colorType -> None} ~ Join ~ Options[ConstructOpInSpinIndexSort];
-Amp2WeylOp[amp_, np_Integer, opts : OptionsPattern[]] :=
-    (ConstructOpInSpinIndexSort[amp, np, Sequence @@ FilterRules[{opts}, Options@ConstructOpInSpinIndexSort]]);
-Amp2WeylOp[amps_Plus, np_Integer, opts : OptionsPattern[]] := Amp2WeylOp[np, opts] /@ Sum2List[amps] // Total;
-Amp2WeylOp[np_Integer, opts : OptionsPattern[]] := Amp2WeylOp[#, np, opts]&;
-Amp2WeylOp[amp_List, np_Integer, opts : OptionsPattern[]] :=
-    (ConstructOpInSpinIndexSort[amp[[2]], np, youngTableaux -> amp[[1]][[1]]
-      , color -> True
-      , If[OptionValue@colorType =!= None,
-        ptclColorIndexs -> GetColorIndDict[su3ShapeDict /@ OptionValue@colorType], Sequence[]]
-      , FilterRules[{opts},
-        Options@ConstructOpInSpinIndexSort]]);
+
+(* ::Subsection:: *)
+(*Gauge*)
+
+
+ClearAll[AppendChainsWithGaugeIndices]
+
+(* 
+  AppendChainsWithGaugeIndices:
+  Appends gauge symmetry indices to relevant elements within chains based on a gauge label and particle gauge index dictionary.
+  
+  Parameters:
+  - gaugeLabel_String: The label used to generate gauge indices.
+  - particleGaugeIndDict_Association: An association mapping integers to gauge index identifiers.
+  
+  Returns:
+  - A function that takes IYT data and chains, and returns the combined list of epsilon objects and updated chains.
+*)
+AppendChainsWithGaugeIndices[gaugeLabel_String, particleGaugeIndDict_Association][IYT[iytData_List], chains_List] := Module[
+  {
+    gaugeIndiceGenerator,
+    gaugeIndexReplaceRules,
+    epsilonObjects,
+    particleGaugeSymDict,
+    UpdateFieldElement,
+    updatedChains
+  },
+  
+  (* Generate a gauge index generator based on the provided gauge label *)
+  gaugeIndiceGenerator = GetIndiceGen[gaugeLabel];
+  
+  (* Create replacement rules for gauge indices from number to symbol *)
+  gaugeIndexReplaceRules = Dispatch[
+    Table[
+      id -> gaugeIndiceGenerator[],
+      {id, Sort@Flatten@Values@particleGaugeIndDict}
+    ]
+  ];
+  
+  (* Generate epsilon objects by replacing indices in iytData *)
+  epsilonObjects = ReplaceAll[gaugeIndexReplaceRules] /@ Flatten[{"\[Epsilon]", ##}] & /@ Transpose@iytData;
+  
+  (* Create a dictionary for particle gauge symmetries *)
+  particleGaugeSymDict = ReplaceAll[gaugeIndexReplaceRules] /@ particleGaugeIndDict;
+  
+  (* Define a local function to update each field object *)
+  UpdateFieldElement = Function[element,
+    Which[
+      MatchQ[element, {field_?IsFieldString, n_Integer, ___}],
+        Join[element, Lookup[particleGaugeSymDict,element[[2]], {}]],
+      True,
+        element
+    ]
+  ];
+  
+  (* Apply the UpdateFieldElement function to each relevant sublist within chains *)
+  updatedChains = Map[UpdateFieldElement, chains, Infinity];
+  
+  (* Combine epsilon objects with updated chains *)
+  Join[epsilonObjects, updatedChains]
+]
+
+
+
+(* ::Subsection:: *)
+(*Final*)
+
+
+ClearAll[TranslateCheckComplete]
+
+(* 
+  TranslateCheckComplete:
+  Checks if the chains list does not contain any patterns matching {sb|ab, n_Integer, ___} or {___, n_Integer, sb|ab}.
+  
+  Parameters:
+  - chains_List: The list of chains to be checked.
+  
+  Returns:
+  - True if no such patterns are found, False otherwise.
+*)
+TranslateCheckComplete[chains_List] := 
+  Count[chains, {sb | ab, n_Integer, ___}] + 
+  Count[chains, {___, n_Integer, sb | ab}] == 0
+
+
+ClearAll[RearrangeIndex]
+
+(* 
+  RearrangeIndex:
+  Replaces old `label` indices with new generated ones as sorted.
+  
+  Parameters:
+  - label_String: The label used to identify and generate new gauge indices.
+  - chains_List: The list of chains to be processed.
+  
+  Returns:
+  - Updated chains with rearranged gauge indices.
+*)
+RearrangeIndex[label_String][chains_List] := Module[
+  {
+    allIndices, 
+    newIndicesGenerator, 
+    indicesReplaceRules
+  },
+  (* Extract all unique indices that start with the specified label followed by "$" *)
+  allIndices = 
+    Cases[
+      Flatten@chains, 
+      a_ /; StringStartsQ[label <> "$"]@ToString@a
+    ] // DeleteDuplicates;
+  
+  (* Initialize a new gauge index generator based on the label *)
+  newIndicesGenerator = GetIndiceGen[label];
+  
+  (* Create replacement rules mapping old indices to new generated indices *)
+  indicesReplaceRules = Dispatch[
+    Table[
+      oldId -> newIndicesGenerator[], 
+      {oldId, allIndices}
+    ]
+  ];
+  
+  (* Apply the replacement rules to rearrange indices in chains *)
+  chains /. indicesReplaceRules
+]
+
+
+ClearAll[WeylObjsCanonical]
+
+(* 
+  WeylObjsCanonical:
+  Processes the chains to separate epsilon chains, trace chains, psi chains, and others.
+  It then rearranges the indices for the "LI" label.
+  
+  Parameters:
+  - chains_List: The list of chains to be canonicalized.
+  
+  Returns:
+  - A rearranged list of chains with canonicalized Weyl objects.
+*)
+WeylObjsCanonical[chains_List] := Module[
+  {
+    epsilonChains, 
+    traceChains, 
+    psiChains, mts,mts2,
+    otherChains
+  },
+  
+  (* Extract chains that start with "\[CurlyEpsilon]" *)
+  epsilonChains = Cases[chains, {"\[Epsilon]", ___}];
+  (* Extract chains that start with "MT" *)
+  mts=Cases[chains, {"MT", ___}];
+  (* Extract chains that start with "Tr" *)
+  traceChains = Cases[chains, {{"Tr"}, ___}];
+  (* Extract chains that start with "\[CapitalPsi]" *)
+  psiChains = Cases[chains, {{"\[Psi]", ___}, ___}];  
+  (* Identify other chains not classified as epsilon, trace, or psi chains *)
+  otherChains = ComplementMultiSet[chains,epsilonChains,mts,traceChains,psiChains];
+  
+  (* Replace specific trace chains with "MT" if conditions are met *)
+  mts2=Cases[traceChains, 
+    {{"Tr"}, {s1_, lor1_}, {s2_, lor2_}} /; 
+      Length@Complement[{"\[Sigma]", "\[Sigma]Bar"}, {s1, s2}] == 0];
+  traceChains = ComplementMultiSet[traceChains, mts2];
+  mts=Join[mts,mts2//.{{"Tr"}, {s1_, lor1_}, {s2_, lor2_}}:> {"MT", lor1, lor2}];
+   
+  (* Rearrange indices for "LI" label and combine all chains *)
+  RearrangeIndex["LI"]@Join[epsilonChains, psiChains, otherChains, mts, traceChains]
+]
+
+
+
+ClearAll[Amp2WeylOp]
+
+(* 
+  Amp2WeylOp:
+  Transforms an amplitude into its Weyl operator representation based on provided options.
+  
+  Parameters:
+  - np_: An integer parameter representing a specific property or identifier.
+  - OptionsPattern[]: Optional parameters including:
+      - mass (default: All)
+      - su2ShapeList (default: {})
+      - su3ShapeList (default: {})
+  
+  Usage:
+  Amp2WeylOp[np, mass -> masses, su2ShapeList -> su2s, su3ShapeList -> su3s][{IYTs__, amp}]
+  Amp2WeylOp[np, mass -> masses][amp]
+*)
+Options[Amp2WeylOp] = {mass -> All, su2ShapeList -> {}, su3ShapeList -> {}};
+Amp2WeylOp[np_Integer, OptionsPattern[]][{IYTs__, amp_?AmplitudeSingletQ}/; 
+ AllTrue[Head /@ {IYTs}, MatchQ[IYT]]] := Module[
+  {
+    iytsList = List[IYTs],
+    su2Shapes = OptionValue[su2ShapeList],
+    su3Shapes = OptionValue[su3ShapeList],
+    su2IndDict,
+    su3IndDict,
+    result
+  },
+  
+  (* Create SU2 Indices Dictionary *)
+  su2IndDict = If[
+    Length[su2Shapes] == 0 || Count[su2Shapes, ""] == Length[su2Shapes],
+    <||>,
+    GetGaugeIndDict[Lookup[su2ShapeDict, #, ""] & /@ su2Shapes]
+  ];
+  
+  (* Create SU3 Indices Dictionary *)
+  su3IndDict = If[
+    Length[su3Shapes] == 0 || Count[su3Shapes, ""] == Length[su3Shapes],
+    <||>,
+    GetGaugeIndDict[Lookup[su3ShapeDict, #, ""] & /@ su3Shapes]
+  ];
+  
+  (* Initialize Result by Applying Amp2WeylOp *)
+  result = Amp2WeylOp[np, mass -> OptionValue[mass]][amp];
+  
+  (* Append Gauge Indices Based on Dictionaries and IYTsList Length *)
+  Which[
+    Length[su2IndDict] > 0 && Length[su3IndDict] > 0 && Length[iytsList] == 2,
+      result = AppendChainsWithGaugeIndices["su3", su3IndDict][iytsList[[2]], result];
+      result = AppendChainsWithGaugeIndices["su2", su2IndDict][iytsList[[1]], result];,
+    
+    Length[su2IndDict] > 0 && Length[iytsList] == 1,
+      result = AppendChainsWithGaugeIndices["su2", su2IndDict][iytsList[[1]], result];,
+    
+    Length[su3IndDict] > 0 && Length[iytsList] == 1,
+      result = AppendChainsWithGaugeIndices["su3", su3IndDict][iytsList[[1]], result];,
+    
+    True,
+      Print["Warning: Mismatch in YT amount or gauge shape."]
+  ];
+  
+  (* Return the Final Result *)
+  Return[result]
+]
+
+Amp2WeylOp[np_Integer, OptionsPattern[]][amp_?AmplitudeSingletQ] := Module[
+  {
+    config,
+    ruleMassless,
+    psiChain,
+    lorgen,
+    posPhi,
+    posPsi,
+    posV,
+    posG,
+    re
+  },
+  
+  (* Generate configuration *)
+  config = Transpose@Amp2MetaInfo[amp, np, mass -> OptionValue[mass]];
+  
+  (* Check spin limit *)
+  If[Max /@ Abs /@ First /@ config > 3/2,
+    Print["spin > 3/2, not implemented"];
+    Abort[]
+  ];
+  
+  (* Create massless rules *)
+  ruleMassless = Table[2 np + 1 - i -> i, {i, np}];
+  
+  (* Find and replace psi chains *)
+  psiChain = FindPsiChain[amp, np, mass -> OptionValue[mass]][[2]] /. ruleMassless;
+  
+  (* Initialize index generator *)
+  lorgen = GetIndiceGen["LI"];
+  
+  (* Initialize result association *)
+  re = <||>;
+  
+  (* Translate D *)
+  re["D"] = DtranslateAll[lorgen][psiChain];
+  
+  (* Find positions in config *)
+  posPhi = Flatten@Position[config, {0, 0}];
+  posPsi = Flatten@Position[config, {1/2 | -1/2, _}];
+  posV = Flatten@Position[config, {1 | -1, _}];
+  posG = Flatten@Position[config, {3/2 | -3/2, _}];
+  
+  (* Translate Phi, Psi, Vector, and Gravitino chains *)
+  re["phi"] = Fold[TranslatePhi[#2][#1] &, Join[{re["D"]}, posPhi]];
+  re["psi"] = Fold[TranslatePsi[#2][#1] &, Join[{re["phi"]}, posPsi]];
+  re["V"] = Fold[TranslateVector[lorgen, #2][#1] &, Join[{re["psi"]}, posV]];
+  re["Gravitino"] = Fold[TranslateGravitino[lorgen, #2][#1] &, Join[{re["V"]}, posG]];
+  
+  (* Verify translation completeness *)
+  If[!TranslateCheckComplete[re["Gravitino"]],
+    Print["Warning! Translation not complete!"];
+    Abort[]
+  ];
+  
+  (* Return canonical Weyl objects *)
+  Return@WeylObjsCanonical[re["Gravitino"]]
+]

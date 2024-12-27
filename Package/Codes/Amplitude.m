@@ -84,6 +84,18 @@ InnerConstructAmp[spins_, antispinors_, np_, ampDim_, masses_] :=
 
 
 
+ClearAll[AmplitudeQ]
+AmplitudeQ[expr_]:=Module[{allowedHeads={Plus,Times,Power},extractElements,allowedElements}, 
+extractElements=expr//.{h_/;MemberQ[allowedHeads,h]->List}//Flatten//DeleteDuplicates;
+AllTrue[extractElements,MatchQ[_?NumericQ|ab[a_,b_]|sb[a_,b_]]]
+]
+ClearAll[AmplitudeSingletQ]
+AmplitudeSingletQ[expr_]:=Module[{allowedHeads={Times,Power},extractElements,allowedElements}, 
+extractElements=expr//.{h_/;MemberQ[allowedHeads,h]->List}//Flatten//DeleteDuplicates;
+AllTrue[extractElements,MatchQ[_?NumericQ|ab[a_,b_]|sb[a_,b_]]]
+]
+
+
 (* ::Section:: *)
 (*Massless limit reduce rules*)
 (*In fact reduce faster by omitting these lower dimensions*)
@@ -130,18 +142,12 @@ ruleP2[Num_] := {
   sb[2, 3]^m_ ab[1, 3]^n_ :>
       Sum[-sb[2, 3]^(m - 1) ab[1, 3]^(n - 1) sb[2, i] ab[1, i], {i, 4, Num}]
 };
-MandelstamS[i_,j_] := ab[i,j]*sb[j,i];
-ruleP3[Num_] := {sb[2, 3] ab[2, 3] :>
-    Sum[MandelstamS[i, j], {i, 2, Num}, {j, Max[i + 1, 4], Num}],
-  sb[2, 3]^m_ ab[2, 3] :>
-      sb[2, 3]^(m - 1) Sum[
-        MandelstamS[i, j], {i, 2, Num}, {j, Max[i + 1, 4], Num}],
-  sb[2, 3] ab[2, 3]^n_ :>
-      ab[2, 3]^(n - 1) Sum[
-        MandelstamS[i, j], {i, 2, Num}, {j, Max[i + 1, 4], Num}],
-  sb[2, 3]^m_ ab[2, 3]^n_ :>
-      sb[2, 3]^(m - 1) ab[2, 3]^(n - 1) Sum[
-        MandelstamS[i, j], {i, 2, Num}, {j, Max[i + 1, 4], Num}]};
+MandelstamS[i_, j_] := ab[i, j]*sb[j, i];
+ruleP3[np_] := {
+  sb[2, 3]^a_. ab[2, 3]^b_. :> (sb[2, 3]^(a - 1)*
+       ab[2, 3]^(b - 1))*(Sum[
+        MandelstamS[j, k], {j, 3, np - 1}, {k, j + 1, np}] + 
+       Sum[MandelstamS[2, k], {k, 4, np}])};
 ruleSchA = {ab[i_, l_] ab[j_, k_] /;
     i < j < k < l :> (-ab[i, j] ab[k, l] + ab[i, k] ab[j, l]),
   ab[i_, l_]^m_ ab[j_, k_] /; i < j < k < l :>
@@ -153,6 +159,7 @@ ruleSchA = {ab[i_, l_] ab[j_, k_] /;
           ab[i, k] ab[j, l])};
 ruleSchS = ruleSchA /. ab -> sb;
 RuleOmitLowDim[np_] := Table[sb[i, 2 * np - i + 1] -> 0, {i, 1, np}];
+ConvertMassiveId2Massless[expr_, np_] := ReplaceBraNumber[expr, Table[np * 2 + 1 - i -> i, {i, np}]];
 
 
 (* ::Section:: *)
@@ -397,21 +404,21 @@ ReduceToBH[ampsFromDict_Association, bhBasis_List, np_Integer, OptionsPattern[]]
 CalcNeededFakeDim[spins_List, physicalDim_Integer, massParm_ : All] := Module[
   {np = Length@spins, masses, dimFakeMinimal, dimMin, spinLeft, dims},
   masses = MassOption[massParm, np];
-  dimFakeMinimal = np + Plus @@ Abs@spins;
+  dimFakeMinimal = np + Total@spins;
   Return[Range[
     Max[
       dimFakeMinimal,
       If[OddQ[physicalDim - dimFakeMinimal], physicalDim + 1, physicalDim]
     ],
-    If[OddQ[# - dimFakeMinimal], # - 1, #]&[physicalDim + Plus @@ MapThread[If[#2 =!= 0, 2 * #1, 0]&, {spins, masses}]]
+    If[OddQ[# - dimFakeMinimal], # - 1, #]&[physicalDim + Total @ MapThread[If[#2 =!= 0, 2 * #1, 0]&, {spins, masses}]]
     , 2]];
 ];
 
-CalcFakeDim[codeDim_Integer, antispinor_List] := codeDim + Plus @@ antispinor;
+CalcFakeDim[codeDim_Integer, antispinor_List] := codeDim + Total @ antispinor;
 CalcAmpDim[codeDim_Integer, np_Integer] := codeDim - np;
 CalcAmpDim[codeDim_Integer, spins_List] := CalcAmpDim[codeDim, Length@spins];
 CalcPhysicalDim[spins_List, codeDim_Integer, antispinor__List, massParm_ : All] :=
-    codeDim - Plus @@ MapThread[
+    codeDim - Total @ MapThread[
       If[#2 =!= 0 && #1 == 1 && #3 == 1, 1, 0]&,
       {spins, MassOption[massParm, Length@spins], antispinor}];
 
@@ -431,7 +438,7 @@ ConstructCFIByFakeDim[spins_, fakeDim_, opts : OptionsPattern[]] :=
       constructOpts = FilterRules[{opts}, Options@ConstructAmp];
       matchOpts = FilterRules[{opts}, Options@MatchCFDim];
       reduceOpts = FilterRules[{opts}, Options@ReduceToBH];
-      dimFakeMinimal = np + Plus @@ Abs@spins;
+      dimFakeMinimal = np + Total[spins];
 
       If[fakeDim < dimFakeMinimal,
         Message[ConstructCFIByFakeDim::BelowDim, fakeDim, dimFakeMinimal];Return[Null]];
@@ -447,7 +454,7 @@ ConstructCFIByFakeDim[spins_, fakeDim_, opts : OptionsPattern[]] :=
             Table[l ~ Append ~ i, {l, #1}, {i, 0,
               If[masses[[#2]] === 0, 0, 2 * spins[[#2]]]}]
         )&, {{}}, Range[np]] // DeleteCases[ConstantArray[0, np]];
-      cfIndexList = Table[If[fakeDim - Plus @@ a >= dimFakeMinimal, {fakeDim - Plus @@ a, a}, Missing[]],
+      cfIndexList = Table[If[fakeDim - Total @ a >= dimFakeMinimal, {fakeDim - Plus @@ a, a}, Missing[]],
         {a, antiList}] // DeleteMissing;
 
       If[OptionValue@log,

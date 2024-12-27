@@ -289,8 +289,8 @@ GetTotalPermutedPolyDict[identicalParticleLists_List] := Module[
     , {identicalParticleList, identicalParticleLists}];
   Return[polyDict];
 ];
-
-GetPermutedPolyFromYT[ytShape_List] := Module[
+ClearAll[GetPermutedPolyFromYT];
+GetPermutedPolyFromYT[ytShape_List]:=GetPermutedPolyFromYT[ytShape]= Module[
   {np = Total@ytShape, cycPolys, swapPolys, totalPolys},
   cycPolys = GenerateYoungSymmetrizer /@ GenerateStandardTableaux@ytShape;
   swapPolys = (SimplifySwapRepresentationPoly@SwapRepresentation[#, np]&) /@ cycPolys;

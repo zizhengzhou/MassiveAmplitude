@@ -1,3 +1,5 @@
+(* ::Package:: *)
+
 (*Model file should be storaged as json*)
 (*Model is an association of particle variable name->definition*)
 (*particle definition is an association of
@@ -8,8 +10,12 @@
   color,
 *)
 
-(* ::Section:: *)
+
+
+(* ::Section::Closed:: *)
 (* Control model *)
+
+
 $currentModel = <||>;
 SetSharedVariable[$currentModel];
 modelDefaultProperties = <|
@@ -67,10 +73,13 @@ ImportModel[fileName_String] := Module[{
   Return[$currentModel];
 ];
 
-(* ::Section:: *)
 
+
+(* ::Section::Closed:: *)
 (*output mode: "amplitude", "operator", "feyncalc", "tex" *)
 (*TODO deliver options*)
+
+
 Options[BasisByModel] := {output -> "tex", log -> False, "form" -> String};
 BasisByModel[particlesParm_List, fromOpDim_, toOpDim_, OptionsPattern[]] := Module[
   {particles, massivePos, masslessPos, np, spins, masses,
