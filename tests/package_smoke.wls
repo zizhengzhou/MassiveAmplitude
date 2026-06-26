@@ -51,4 +51,9 @@ If[$SewingDebug =!= False,
   Exit[1]
 ];
 
+If[SewingStaticXPower[<|"SortData" -> <|"J" -> 1, "Xhard" -> 2, "Xsoft" -> 0|>|>] =!= 2,
+  Print["SewingStaticXPower should read Xhard for J>0 records."];
+  Exit[1]
+];
+
 Print["package smoke ok"];

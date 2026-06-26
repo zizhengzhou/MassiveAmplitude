@@ -81,7 +81,7 @@ SewingSortData::usage =
 SewingSortDataQ::usage =
   "SewingSortDataQ[record] returns True when the sewing record carries valid integer SortData fields \"J\", \"Xsoft\", and \"Xhard\".";
 SewingStaticXPower::usage =
-  "SewingStaticXPower[record] returns the number of static x-type closed heavy-pair factors visible in a sewing record. The current rule reads SortData and counts Xhard only in the closed J=0 channel.";
+  "SewingStaticXPower[record] returns the Xhard power recorded in the sewing record SortData metadata. This is the XPower used by SewingRelativeChiralOrder.";
 SewingRelativeChiralOrder::usage =
   "SewingRelativeChiralOrder[record] returns the relative chiral-order sorting label dAmp - nStaticX - J read from explicit sewing metadata. It does not include any sector-dependent additive offset.";
 SewingChiralSortKey::usage =
@@ -970,7 +970,7 @@ SewingSortDataQ[rec_Association] := Module[
 
 SewingStaticXPower[rec_Association] := Module[{data = SewingSortData[rec]},
   If[! TrueQ[SewingSortDataQ[rec]], Return[$Failed]];
-  If[data["J"] === 0, data["Xhard"], 0]
+  data["Xhard"]
 ];
 
 SewingRelativeChiralOrder[rec_Association] := Module[{ampDim, data, staticX},

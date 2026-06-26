@@ -31,7 +31,7 @@ RelativeOrder = AmpDim - XPower - J
 ```
 
 where `XPower` is `SewingStaticXPower[rec]`.  In the present implementation
-this counts `Xhard` only for the closed \(J=0\) static heavy-pair factor.
+this directly reads the `Xhard` power stored in `SortData`.
 
 The global table is not obtained by independently reducing each fixed
 `ampDim` space first.  The tested procedure is:
