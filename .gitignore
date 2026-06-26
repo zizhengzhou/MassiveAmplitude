@@ -1,0 +1,11 @@
+.DS_Store
+Thumbs.db
+*.mx
+*.nb
+*.bak
+*.tmp
+*.aux
+*.log.tmp
+.tmp*/
+__tmp*
+
