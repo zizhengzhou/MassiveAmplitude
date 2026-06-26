@@ -43,7 +43,13 @@ The working construction for an \(n\)-point amplitude is:
 
 ## Verification
 
-From the repository root, the intended smoke checks are the Wolfram test files
-under `tests/`.  The original scripts assume the old package directory layout;
-before large edits, update the test loader paths so they resolve against this
-repository's `src/Package` tree.
+From the repository root, run:
+
+```powershell
+wolframscript -file tests\package_smoke.wls
+wolframscript -file tests\usage_audit.wls
+```
+
+The first script checks that the package loads from `src/Package` and that the
+primary entry points are defined. The second script checks the public usage
+strings and the message strings used by the current error paths.

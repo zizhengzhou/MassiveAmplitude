@@ -9,7 +9,8 @@
 
 
 ClearAll[Poly2Singlet];
-ConstructIndepCFBlock::usage = "Extract the singlet from a polymomial";
+Poly2Singlet::usage =
+  "Poly2Singlet[expr] extracts distinct monomial terms from a polynomial expression, dropping numeric coefficients.";
 Poly2Singlet[amp_List] := Poly2Singlet /@ amp // Flatten // DeleteDuplicates;
 Poly2Singlet[amp_Plus] := Poly2Singlet /@ (List @@ amp) // Flatten // DeleteDuplicates;
 Poly2Singlet[c_?NumberQ * b_] := {b};
@@ -18,7 +19,8 @@ Poly2Singlet[c_?NumberQ] := {};
 Poly2Singlet[b_] := {b};
 ClearAll[ConstructIndepCFBlock];
 Options@ConstructIndepCFBlock = {mass -> All, timeDebug -> False};
-ConstructIndepCFBlock::usage = "Construct specific cf block. Reduandancy removed locally. Return {idenpendent basis,coeff matrix, basis}";
+ConstructIndepCFBlock::usage =
+  "ConstructIndepCFBlock[spins, codeDim, polarization, opts] constructs a fixed-polarization CF block, reduces it in the massless limit, removes local linear redundancy, and returns {independentAmplitudes, coefficientMatrix, monomialBasis}.";
 ConstructIndepCFBlock[spins_List, codeDim_, polarization_List, OptionsPattern[]] := Module[{
     np = Length@spins,
     cf0, masslessLimitRule, rcfHE, basis, coeff, posIndep, TimingPrint}, 
@@ -66,6 +68,8 @@ GetDCodeListUpdate[spinList_, phyDim_, massList_] := Module[{positions, dimEva, 
    finalCombo // SortBy[First]];
 ClearAll[GenerateNeedCFBlocks];
 Options@GenerateNeedCFBlocks = {mass -> All};
+GenerateNeedCFBlocks::usage =
+  "GenerateNeedCFBlocks[spins, physicalDim, opts] returns the code dimensions and polarization sectors needed by the legacy CF-block pipeline at a physical dimension.";
 GenerateNeedCFBlocks[spins_, physicalDim_, OptionsPattern[]] := GetDCodeListUpdate[spins, physicalDim, MassOption[OptionValue@mass, Length@spins]];
 
 

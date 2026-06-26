@@ -717,6 +717,7 @@ WeylObjsCanonical[chains_List] := Module[
 
 
 ClearAll[Amp2WeylOp]
+Amp2WeylOp::usage = "Amp2WeylOp[n, opts][amp] translates a spinor-helicity monomial, optionally with gauge tableaux, to the package Weyl-operator chain representation.";
 
 (* 
   Amp2WeylOp:

@@ -23,6 +23,7 @@ ClearAll[
   SewingAmpMetaTerms, SewingRecordPolarizationMatchQ, SewingIndependentBlockFromRecords,
   SewingMasslessSelfColumnFreeQ, SewingLeftRecordCheck, SewingRightRecordCheck, SewingSewnRecordCheck,
   SewingCheckFailureQ, SewingCheckFailureMessage,
+  SewingProjectAuxiliaryLabels, SewingNormalizeJTarget,
   SewingSortData, SewingSortDataQ,
   SewingBasisSortKey, SewingSortRecordsForBasis
 ];
@@ -39,8 +40,14 @@ SewingAuxiliaryAmpToFormalJ::usage =
   "SewingAuxiliaryAmpToFormalJ[amp] filters and translates an auxiliary on-shell amplitude to the formal-J right-half amplitude.";
 SewingAuxiliaryAmpToFormalJCandidates::usage =
   "SewingAuxiliaryAmpToFormalJCandidates[amp] returns all formal-J right-half amplitudes obtained by keeping each single auxiliary label as a supplemental left label or replacing it by J.";
+SewingProjectAuxiliaryLabels::usage =
+  "SewingProjectAuxiliaryLabels[amp, auxLabels, jLabel] replaces the two auxiliary labels in amp by the formal current label jLabel and removes self-contractions. The default is SewingProjectAuxiliaryLabels[amp, {1, 2}, J].";
+SewingNormalizeJTarget::usage =
+  "SewingNormalizeJTarget[target] returns an association with separate \"AngleJ\", \"SquareJ\", and \"TotalJ\" counts extracted from a target association containing \"Angle\" and \"Square\" count associations.";
 ConstructRightAuxiliaryOnShellRecords::usage =
   "ConstructRightAuxiliaryOnShellRecords[rightSpins, nCols, opts] constructs right-half auxiliary on-shell amplitudes, translates the auxiliary labels to the formal J slot, and returns records with angle/square label counts.";
+ConstructRightAuxiliaryOnShellRecords::amp =
+  "Auxiliary amplitude construction failed for spins `1`, codeDim `2`, antispinor `3`, and mass `4`.";
 ConstructRightProjectedJResidualRecords::usage =
   "ConstructRightProjectedJResidualRecords[leftJTarget, rightSpins, rightMass, rightPolarization, rightAmpDim, opts] constructs right residual records from auxiliary particles, projects them to the formal J slot, removes vanishing projections, and filters the survivors by separate J-angle and J-square counts.";
 CompareRightAuxiliaryOnShellToDirectJ::usage =
@@ -51,6 +58,8 @@ ConstructGeneralSewingAmplitudeRecords::usage =
   "ConstructGeneralSewingAmplitudeRecords[leftSpin, rightSpins, ampDim, rightPolarization, opts] constructs sewn amplitude records for an equal-spin left current and a physical right residual sector. Each record carries `AmpL`, `AmpR`, `TotalAmp`, `ReducedAmp`, left/right provenance, `SortData`, and `QReplacement`. `QReplacement` may be a symbol (kept symbolic), an integer label, or a signed list such as `{1,2}` or `{1,-2}` interpreted termwise in `(<QJ>[QJ])^n`.";
 ConstructGeneralSewingAmplitudeRecords::ampdim =
   "Internal sewing dimension mismatch for J=`1`, left degree data `2`, right ampDim `3`. The sewn amplitude has bracket degrees `4`, but expected ampDim `5`.";
+ConstructGeneralSewingAmplitudeRecords::args =
+  "Invalid sewing input: full point count `1`, right spin count `2`, and right polarization length `3`.";
 ConstructGeneralSewingAmplitudeRecords::check =
   "Sewing construction check failed: `1`.";
 ConstructIndepSewingBlock::usage =
@@ -63,6 +72,18 @@ ConstructIndepSewingBlock::records =
   "Sewing record construction failed.";
 SewingSortRecordsForBasis::sortdata =
   "Cannot sort sewing records because at least one record has missing or invalid SortData metadata.";
+SewingSortData::usage =
+  "SewingSortData[record] returns the explicit SortData association for a sewing record, falling back to record[\"LeftRecord\", \"SortData\"] when present.";
+SewingSortDataQ::usage =
+  "SewingSortDataQ[record] returns True when the sewing record carries valid integer SortData fields \"J\", \"Xsoft\", and \"Xhard\".";
+SewingBasisSortKey::usage =
+  "SewingBasisSortKey[record] returns the fixed priority key used for independent sewing basis selection: lower J, then higher Xsoft, then higher Xhard.";
+SewingSortRecordsForBasis::usage =
+  "SewingSortRecordsForBasis[records] sorts sewing records using explicit SortData metadata and fails if any record has missing or invalid SortData.";
+SewingIndependentBlockFromRecords::usage =
+  "SewingIndependentBlockFromRecords[records, basis] reduces sewn records to a rank-maximal independent block and returns {basisRecords, coefficientMatrix, reducedMonomialBasis}. If basis is Automatic, it is built from reduced monomials.";
+SewingCoeffMatrixDataUnion::usage =
+  "SewingCoeffMatrixDataUnion[records, basis] returns an association containing the coefficient matrix, rank, reduced amplitudes, and monomial basis for a list of sewing records.";
 CompareGeneralSewingToCFBlocks::usage =
   "CompareGeneralSewingToCFBlocks[leftSpin, rightSpins, ampDim, rightPolarization, opts] compares the sewn records against matching `ConstructIndepCFBlock` results after massless reduction. It returns the sewn/CF records, common monomial basis, coefficient matrices, ranks, and the completeness verdict `CompleteQ`.";
 
@@ -70,6 +91,8 @@ SewingApplyLeftQReplacement::badq =
   "Unsupported QReplacement specification `1`. Use a symbol, an integer label, or a signed integer list such as {1,2} or {1,-2}.";
 ConstructRightProjectedJResidualRecords::check =
   "Projected right residual construction failed the J-shape filter: `1`.";
+CompareGeneralSewingToCFBlocks::cf =
+  "CF comparison failed for spin sector `1`, codeDim `2`, polarization `3`, mass `4`.";
 
 SewingJFactorQ[head_][factor_] :=
   MatchQ[factor, head[J, _] | head[_, J]];
@@ -452,6 +475,7 @@ Options[ConstructRightAuxiliaryOnShellRecords] = Join[
     JLabel -> J,
     CodeDim -> Automatic,
     RejectMasslessSelfColumns -> True,
+    SewingDebug -> False,
     mass -> {3}
   }
 ];
@@ -459,8 +483,9 @@ ConstructRightAuxiliaryOnShellRecords[rightSpins_List, nCols_Integer?NonNegative
   {
     auxRange, equalAuxQ, rightAntispinor, targetIn, target, labels, auxLabels, jLabel,
     codeDimOpt, masses, spinPairs, records, np, spins, antispinor,
-    codeDim, amps, formalAmps, formalAmp, counts, recordLabels
+    codeDim, amps, formalAmps, formalAmp, counts, recordLabels, debug
   },
+  debug = TrueQ[OptionValue[SewingDebug]];
   auxRange = Replace[OptionValue[AuxiliarySpinRange], Automatic -> SewingAutomaticAuxiliarySpinRange[nCols]];
   equalAuxQ = OptionValue[EqualAuxiliarySpin];
   rightAntispinor = Replace[
@@ -477,13 +502,31 @@ ConstructRightAuxiliaryOnShellRecords[rightSpins_List, nCols_Integer?NonNegative
   jLabel = OptionValue[JLabel];
   codeDimOpt = OptionValue[CodeDim];
   masses = OptionValue[mass];
+  spinPairs = SewingAuxiliarySpinPairs[
+    rightSpins,
+    Replace[codeDimOpt, Automatic -> nCols + 2 + Length[rightSpins]],
+    rightAntispinor,
+    masses,
+    auxRange,
+    equalAuxQ
+  ];
+  SewingLog[
+    debug,
+    "RightAuxiliary.Start",
+    <|"RightSpins" -> rightSpins, "nCols" -> nCols, "SpinPairs" -> spinPairs|>
+  ];
   records = Flatten@Table[
     spins = Join[spinPair, rightSpins];
     np = Length[spins];
     antispinor = Join[ConstantArray[0, Length[spinPair]], rightAntispinor];
     codeDim = Replace[codeDimOpt, Automatic -> nCols + np];
-    amps = Quiet@Check[SewingConstructAmpRaw[spins, codeDim, antispinor, masses], {}];
+    amps = Quiet@Check[
+      SewingConstructAmpRaw[spins, codeDim, antispinor, masses],
+      Message[ConstructRightAuxiliaryOnShellRecords::amp, spins, codeDim, antispinor, masses];
+      {}
+    ];
     If[! ListQ[amps], amps = {}];
+    SewingLog[debug, "RightAuxiliary.Sector", <|"SpinPair" -> spinPair, "RawAmpCount" -> Length[amps]|>];
     Table[
       If[
         TrueQ[OptionValue[RejectMasslessSelfColumns]] &&
@@ -516,16 +559,11 @@ ConstructRightAuxiliaryOnShellRecords[rightSpins_List, nCols_Integer?NonNegative
       ],
       {amp, amps}
     ],
-    {spinPair, SewingAuxiliarySpinPairs[
-      rightSpins,
-      Replace[codeDimOpt, Automatic -> nCols + 2 + Length[rightSpins]],
-      rightAntispinor,
-      masses,
-      auxRange,
-      equalAuxQ
-    ]}
+    {spinPair, spinPairs}
   ];
-  DeleteDuplicatesBy[records, {#["AuxiliarySpin"], ToString[#["AmpR"], InputForm]} &]
+  records = DeleteDuplicatesBy[records, {#["AuxiliarySpin"], ToString[#["AmpR"], InputForm]} &];
+  SewingLog[debug, "RightAuxiliary.Done", <|"RecordCount" -> Length[records]|>];
+  records
 ];
 
 SewingProjectAuxiliaryLabels[amp_, auxLabels_: {1, 2}, jLabel_: J] :=
@@ -556,8 +594,9 @@ ConstructRightProjectedJResidualRecords[
 ] := Module[
   {
     leftJTarget, auxLabels, jLabel, raw, projected, counts, keepQ, rejectedReason,
-    accepted, rejected, decorate
+    accepted, rejected, decorate, debug
   },
+  debug = TrueQ[OptionValue[SewingDebug]];
   leftJTarget = SewingNormalizeJTarget[leftJTargetIn];
   auxLabels = OptionValue[AuxiliaryLabels];
   jLabel = OptionValue[JLabel];
@@ -580,6 +619,7 @@ ConstructRightProjectedJResidualRecords[
     ]
   ];
   If[raw === $Failed || ! ListQ[raw], Return[{}]];
+  SewingLog[debug, "RightProjected.Raw", <|"RawCount" -> Length[raw], "Target" -> leftJTarget|>];
   decorate[rec_] := Module[{amp = rec["AuxiliaryAmp"], projectedAmp, jCounts},
     projectedAmp = SewingProjectAuxiliaryLabels[amp, auxLabels, jLabel];
     jCounts = SewingJCounts[projectedAmp];
@@ -611,6 +651,7 @@ ConstructRightProjectedJResidualRecords[
     accepted,
     {#["AuxiliarySpin"], ToString[#["ProjectedAmpR"], InputForm]} &
   ];
+  SewingLog[debug, "RightProjected.Done", <|"Accepted" -> Length[accepted], "Rejected" -> Length[raw] - Length[accepted]|>];
   If[! TrueQ[OptionValue[ReturnRejected]],
     Return[accepted]
   ];
@@ -1056,7 +1097,8 @@ Options[ConstructGeneralSewingAmplitudeRecords] = Join[
     CheckVerbose -> False,
     FilterPhysicalSector -> True,
     FilterByAmpDim -> True,
-    DeduplicateByReducedAmp -> False
+    DeduplicateByReducedAmp -> False,
+    SewingDebug -> False
   },
   Options[ConstructRightAuxiliaryOnShellRecords],
   Options[SewingReducedMasslessGeneral]
@@ -1086,12 +1128,15 @@ ConstructGeneralSewingAmplitudeRecords[
   {
     npFull, npRight, rightMassData, rightMass, jRangeOpt, jMaxOpt, jRange,
     leftRecords, rightRecordsFor, rightRecords, rows, reducedOpts, key, qSpec,
-    leftChecks, failedChecks, cfPolarizations
+    leftChecks, failedChecks, cfPolarizations, debug
   },
+  debug = TrueQ[OptionValue[SewingDebug]];
   npFull = 2 + Length[rightSpins];
   npRight = 2 + Length[rightSpins];
-  If[npFull < 4, Return[{}]];
-  If[Length[rightPolarization] =!= Length[rightSpins], Return[{}]];
+  If[npFull < 4 || Length[rightPolarization] =!= Length[rightSpins],
+    Message[ConstructGeneralSewingAmplitudeRecords::args, npFull, Length[rightSpins], Length[rightPolarization]];
+    Return[{}]
+  ];
   rightMassData = SewingMassOptionData[OptionValue[LeftMass], OptionValue[RightMass], rightSpins];
   rightMass = rightMassData["RightConstructMass"];
   jRangeOpt = OptionValue[JRange];
@@ -1102,6 +1147,11 @@ ConstructGeneralSewingAmplitudeRecords[
     True, Range[0, SewingDefaultJMax[leftSpin, ampDim, rightSpins]]
   ];
   qSpec = OptionValue[QReplacement];
+  SewingLog[
+    debug,
+    "General.Start",
+    <|"LeftSpin" -> leftSpin, "RightSpins" -> rightSpins, "AmpDim" -> ampDim, "JRange" -> jRange|>
+  ];
   cfPolarizations = Flatten[
     Table[
       Join[{a, b}, rightPolarization],
@@ -1119,6 +1169,7 @@ ConstructGeneralSewingAmplitudeRecords[
     ] & /@ jRange
   ];
   If[MemberQ[leftRecords, $Failed], Return[$Failed]];
+  SewingLog[debug, "General.LeftRecords", <|"Count" -> Length[leftRecords]|>];
   If[TrueQ[OptionValue[Check3Point]],
     leftChecks = SewingLeftRecordCheck /@ leftRecords;
     failedChecks = Select[leftChecks, SewingCheckFailureQ];
@@ -1137,21 +1188,25 @@ ConstructGeneralSewingAmplitudeRecords[
     rightAmpDim = ampDim - SewingLeftDegreeData[left["AmpL"]]["Total"] + leftJCounts["TotalJ"];
     If[rightAmpDim < 0,
       {},
-      Append[#, "RightAmpDim" -> rightAmpDim] & /@
-        ConstructRightProjectedJResidualRecords[
-          <|"AngleJ" -> leftJCounts["AngleJ"], "SquareJ" -> leftJCounts["SquareJ"]|>,
-          rightSpins,
-          rightMass,
-          rightPolarization,
-          rightAmpDim,
-          Sequence @@ Join[
-            FilterRules[{opts}, Options[ConstructRightProjectedJResidualRecords]],
-            {
-              CodeDim -> SewingCodeDimFromAmpDim[rightAmpDim, npRight],
-              EqualAuxiliarySpin -> True
-            }
-          ]
-        ]
+      Module[{rr},
+        rr = Append[#, "RightAmpDim" -> rightAmpDim] & /@
+          ConstructRightProjectedJResidualRecords[
+            <|"AngleJ" -> leftJCounts["AngleJ"], "SquareJ" -> leftJCounts["SquareJ"]|>,
+            rightSpins,
+            rightMass,
+            rightPolarization,
+            rightAmpDim,
+            Sequence @@ Join[
+              FilterRules[{opts}, Options[ConstructRightProjectedJResidualRecords]],
+              {
+                CodeDim -> SewingCodeDimFromAmpDim[rightAmpDim, npRight],
+                EqualAuxiliarySpin -> True
+              }
+            ]
+          ];
+        SewingLog[debug, "General.RightRecords", <|"J" -> left["J"], "RightAmpDim" -> rightAmpDim, "Count" -> Length[rr]|>];
+        rr
+      ]
     ]
   ];
   reducedOpts = Sequence @@ Join[
@@ -1226,11 +1281,14 @@ ConstructGeneralSewingAmplitudeRecords[
     {left, leftRecords}
   ], ConstructGeneralSewingAmplitudeRecords];
   If[rows === $Failed, Return[$Failed]];
+  SewingLog[debug, "General.Rows", <|"RowsBeforeDedup" -> Length[rows]|>];
   key[rec_] := If[TrueQ[OptionValue[DeduplicateByReducedAmp]],
     ToString[rec["ReducedAmp"], InputForm],
     ToString[{rec["J"], rec["LeftStructure"], rec["QComponent"], rec["AuxiliarySpin"], rec["AmpL"], rec["AmpR"]}, InputForm]
   ];
-  DeleteDuplicatesBy[rows, key]
+  rows = DeleteDuplicatesBy[rows, key];
+  SewingLog[debug, "General.Done", <|"Rows" -> Length[rows]|>];
+  rows
 ];
 
 SewingIndependentBlockFromRecords[records_List, basis_: Automatic] := Module[
@@ -1302,8 +1360,9 @@ CompareGeneralSewingToCFBlocks[
 ] := Module[
   {
     np, codeDim, leftMass, rightMassData, rightMass, fullMass, spins, leftPolarRange, cfPolarizations,
-    cfRows, sewingRows, basis, cfMatrix, sewingMatrix, joinedMatrix
+    cfRows, sewingRows, basis, cfMatrix, sewingMatrix, joinedMatrix, debug
   },
+  debug = TrueQ[OptionValue[SewingDebug]];
   np = 2 + Length[rightSpins];
   If[np < 4, Return[<|"Error" -> "Right side must contain at least two physical particles, so full n must be at least 4."|>]];
   codeDim = SewingCodeDimFromAmpDim[ampDim, np];
@@ -1341,6 +1400,7 @@ CompareGeneralSewingToCFBlocks[
     ],
     {polar, cfPolarizations}
   ];
+  SewingLog[debug, "Compare.CF", <|"CFRecords" -> Length[cfRows], "CFPolarizations" -> Length[cfPolarizations]|>];
   sewingRows = ConstructGeneralSewingAmplitudeRecords[
     leftSpin,
     rightSpins,
@@ -1379,11 +1439,17 @@ CompareGeneralSewingToCFBlocks[
   If[TrueQ[OptionValue[FilterSewingByCFPolarization]],
     sewingRows = Select[sewingRows, SewingRecordPolarizationMatchQ[#, cfPolarizations, np, fullMass] &]
   ];
+  SewingLog[debug, "Compare.Sewing", <|"SewingRecords" -> Length[sewingRows]|>];
   sewingRows = Append[#, "MetaTerms" -> SewingAmpMetaTerms[#["TotalAmp"], np, fullMass]] & /@ sewingRows;
   basis = Poly2Singlet[Join[Lookup[cfRows, "ReducedAmp", {}], Lookup[sewingRows, "ReducedAmp", {}]]];
   cfMatrix = SewingCoeffMatrixDataUnion[cfRows, basis];
   sewingMatrix = SewingCoeffMatrixDataUnion[sewingRows, basis];
   joinedMatrix = SewingCoeffMatrixDataUnion[Join[cfRows, sewingRows], basis];
+  SewingLog[
+    debug,
+    "Compare.Ranks",
+    <|"CFRank" -> cfMatrix["Rank"], "SewingRank" -> sewingMatrix["Rank"], "JoinedRank" -> joinedMatrix["Rank"]|>
+  ];
   <|
     "AmpDim" -> ampDim,
     "CodeDim" -> codeDim,
@@ -1405,7 +1471,8 @@ CompareGeneralSewingToCFBlocks[
 Options[ConstructIndepSewingBlock] = Join[
   {
     CheckAgainstCF -> False,
-    FilterSewingByCFPolarization -> False
+    FilterSewingByCFPolarization -> False,
+    SewingDebug -> False
   },
   DeleteCases[Options[CompareGeneralSewingToCFBlocks], (FilterSewingByCFPolarization -> _)]
 ];
@@ -1433,9 +1500,11 @@ ConstructIndepSewingBlock[
 ] := Module[
   {
     records, comparison, np, leftMass, rightMassData, fullMass, leftPolarRange,
-    cfPolarizations, block, blockRank, cfRank
+    cfPolarizations, block, blockRank, cfRank, debug
   },
+  debug = TrueQ[OptionValue[SewingDebug]];
   If[TrueQ[OptionValue[CheckAgainstCF]],
+    SewingLog[debug, "Independent.CompareStart", <|"LeftSpin" -> leftSpin, "AmpDim" -> ampDim|>];
     comparison = CompareGeneralSewingToCFBlocks[
       leftSpin,
       rightSpins,
@@ -1460,6 +1529,7 @@ ConstructIndepSewingBlock[
     ];
     cfRank = comparison["CFMatrix"]["Rank"];
     blockRank = If[ListQ[block] && Length[block] == 3, MatrixRank[block[[2]]], -1];
+    SewingLog[debug, "Independent.Block", <|"BlockRows" -> If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], 0], "BlockRank" -> blockRank, "CFRank" -> cfRank|>];
     If[
       ! (ListQ[block] && Length[block] == 3 && blockRank == Length[block[[1]]] && blockRank == cfRank),
       Message[
@@ -1501,7 +1571,9 @@ ConstructIndepSewingBlock[
   ];
   records = SewingSortRecordsForBasis[records];
   If[records === $Failed, Return[$Failed]];
-  SewingIndependentBlockFromRecords[records]
+  block = SewingIndependentBlockFromRecords[records];
+  SewingLog[debug, "Independent.Done", <|"InputRecords" -> Length[records], "BlockRows" -> If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], 0]|>];
+  block
 ];
 
 

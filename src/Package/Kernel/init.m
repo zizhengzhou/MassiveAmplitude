@@ -1,15 +1,25 @@
 (* ::Package:: *)
-$DEBUG = True;
+$DEBUG = False;
 
 Print["initializing..."];
 If[$DEBUG =!= True, $DEBUG = False;];
-$MassiveDir = FileNameDrop[
-  If[$InputFileName === "", NotebookFileName[], $InputFileName]
-  , -2];
-$CodeFiles = Select[
-  FileNames[__ ~~ ".m", FileNameJoin[{$MassiveDir, "Codes"}]],
-  ! StringContainsQ[FileNameTake[#], "ZZZNoteBook"] &
+$MassiveDir = If[
+  FileExistsQ[FileNameJoin[{Directory[], "src", "Package", "MassiveBasis.m"}]],
+  FileNameJoin[{Directory[], "src", "Package"}],
+  FileNameDrop[If[$InputFileName === "", NotebookFileName[], $InputFileName], -2]
 ];
+$CodeFiles = FileNameJoin[{$MassiveDir, "Codes", #}] & /@ {
+  "Tools.m",
+  "SSYT.m",
+  "Permutation.m",
+  "Amplitude.m",
+  "CFblocks.m",
+  "Operator.m",
+  "FormatOutput.m",
+  "Sewing.m",
+  "Cache.m"
+};
+$CodeFiles = Select[$CodeFiles, FileExistsQ];
 
 Print["Codes Files:", $CodeFiles];
 Get[FileNameJoin[{$MassiveDir, "MassiveBasis.m"}]]

@@ -5,7 +5,18 @@ LogPri["Amplitude Loaded"];
 (*Option Controller*)
 
 $BHBasisHeadUse = sb;
-MassOption::usage = "General contruction of mass options for all amplitudes functions."
+MassOption::usage =
+  "MassOption[mass, n] expands a mass specification into an n-entry mass vector. A list is padded or truncated; a list of integer particle labels marks those particles massive; All marks every particle massive.";
+ConstructAmp::usage =
+  "ConstructAmp[spins, codeDim, opts] constructs local spinor-helicity amplitudes for the given external spins at package code dimension codeDim. Options include antispinor and mass.";
+CheckAmpConstruction::usage =
+  "CheckAmpConstruction[spins, ampDim, antispinors, masses] returns True when the requested amplitude dimension, spin, polarization, and mass data pass the package construction constraints.";
+InnerConstructAmp::usage =
+  "InnerConstructAmp[spins, antispinors, n, ampDim, masses] returns the internal SSYT filling parameters used by ConstructAmp.";
+ReduceSt::usage =
+  "ReduceSt[amp, n] reduces an amplitude using Schouten and momentum-conservation identities for n external particles. ReduceSt[n] returns the corresponding operator form.";
+ConstructCFIByFakeDim::usage =
+  "ConstructCFIByFakeDim[spins, fakeDim, opts] constructs current-factorization data at a fake dimension used by the legacy independent-basis pipeline.";
 MassOption[masses_List, np_] :=
     If[np > Length@masses,
       masses ~ Join ~ ConstantArray[0, np - Length@masses],
@@ -422,8 +433,10 @@ CalcPhysicalDim[spins_List, codeDim_Integer, antispinor__List, massParm_ : All] 
       If[#2 =!= 0 && #1 == 1 && #3 == 1, 1, 0]&,
       {spins, MassOption[massParm, Length@spins], antispinor}];
 
-ConstructCFIByFakeDim::BelowDim = "`1` Below minimal operator dimension `2` !";
-ConstructCFIByFakeDim::MismatchDim = "`1` is not match to `2` + 2n !";
+ConstructCFIByFakeDim::BelowDim =
+  "Requested fake dimension `1` is below the minimal operator dimension `2`.";
+ConstructCFIByFakeDim::MismatchDim =
+  "Requested fake dimension `1` does not match the allowed sequence `2` + 2 n.";
 
 Options@ConstructCFIByFakeDim = Normal@Association@(Join @@ (Options /@
     {ConstructAmp, MatchCFDim, ReduceToBH}));
