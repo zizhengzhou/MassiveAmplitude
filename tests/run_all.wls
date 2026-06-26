@@ -13,6 +13,7 @@ scripts = {
   "package_smoke.wls",
   "usage_audit.wls",
   "section_5_2_bbuf_reproduce.wls",
+  "section_5_2_split_sum_independent_counts.wls",
   "section_5_2_chiral_order_reproduce.wls"
 };
 
