@@ -17,7 +17,7 @@ Print["Loading MassiveBasis..."];
 {ConstructGeneralSewingAmplitudeRecords, ConstructIndepSewingBlock, CompareGeneralSewingToCFBlocks};
 {SewingProjectAuxiliaryLabels, SewingNormalizeJTarget};
 {SewingIndependentBlockFromRecords, SewingCoeffMatrixDataUnion};
-{SewingSortData, SewingSortDataQ, SewingBasisSortKey, SewingSortRecordsForBasis};
+{SewingSortData, SewingSortDataQ, SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder, SewingBasisSortKey, SewingSortRecordsForBasis};
 {MassiveSpin};
 {ab, sb};
 {Sum2List, Prod2List, FindIndependentBasisPos, FindCoordinate};

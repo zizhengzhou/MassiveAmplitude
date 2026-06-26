@@ -7,6 +7,8 @@ requiredSymbols = {
   ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
   SewingSortRecordsForBasis,
+  SewingRelativeChiralOrder,
+  SewingSortRecordsByChiralOrder,
   SewingLog,
   ConstructIndepCFBlock,
   ConstructAmp,

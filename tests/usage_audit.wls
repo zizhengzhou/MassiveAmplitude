@@ -16,6 +16,10 @@ publicSymbols = {
   ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
   SewingSortRecordsForBasis,
+  SewingStaticXPower,
+  SewingRelativeChiralOrder,
+  SewingChiralSortKey,
+  SewingSortRecordsByChiralOrder,
   SewingIndependentBlockFromRecords,
   SewingCoeffMatrixDataUnion,
   SewingDebug,
@@ -45,6 +49,7 @@ messageSymbols = {
   ConstructIndepSewingBlock::indcheck,
   ConstructIndepSewingBlock::records,
   SewingSortRecordsForBasis::sortdata,
+  SewingSortRecordsByChiralOrder::metadata,
   ConstructCFIByFakeDim::BelowDim,
   ConstructCFIByFakeDim::MismatchDim
 };

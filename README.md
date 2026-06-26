@@ -46,10 +46,10 @@ The working construction for an \(n\)-point amplitude is:
 From the repository root, run:
 
 ```powershell
-wolframscript -file tests\package_smoke.wls
-wolframscript -file tests\usage_audit.wls
+wolframscript -file tests\run_all.wls
 ```
 
-The first script checks that the package loads from `src/Package` and that the
-primary entry points are defined. The second script checks the public usage
-strings and the message strings used by the current error paths.
+The maintained regression entry point runs the package smoke test, usage audit,
+fixed-dimension Section 5.2 rank reproduction, and relative chiral-order
+reproduction.  The relative chiral-order witness is written to
+`logs/section_5_2_relative_chiral_orders.log`.

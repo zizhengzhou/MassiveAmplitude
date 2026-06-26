@@ -5,6 +5,7 @@ LogPri["Sewing Loaded"];
 ClearAll[
   SewingJFactorQ, SewingJCounts, SewingCountsMatchQ,
   SewingClosedPairMonomials, SewingOpenPairMonomials,
+  SewingBalancedOpenPairQ,
   ConstructLeft3PointOpenBasis,
   SewingQSingleFactor, SewingApplyLeftQReplacement,
   SewingRightResidualRecordsDirect, SewingRightResidualRecordsAuxiliary,
@@ -25,6 +26,7 @@ ClearAll[
   SewingCheckFailureQ, SewingCheckFailureMessage,
   SewingProjectAuxiliaryLabels, SewingNormalizeJTarget,
   SewingSortData, SewingSortDataQ,
+  SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder,
   SewingBasisSortKey, SewingSortRecordsForBasis
 ];
 
@@ -72,16 +74,26 @@ ConstructIndepSewingBlock::records =
   "Sewing record construction failed.";
 SewingSortRecordsForBasis::sortdata =
   "Cannot sort sewing records because at least one record has missing or invalid SortData metadata.";
+SewingSortRecordsByChiralOrder::metadata =
+  "Cannot sort sewing records by chiral order because at least one record has missing or invalid AmpDim or SortData metadata.";
 SewingSortData::usage =
   "SewingSortData[record] returns the explicit SortData association for a sewing record, falling back to record[\"LeftRecord\", \"SortData\"] when present.";
 SewingSortDataQ::usage =
   "SewingSortDataQ[record] returns True when the sewing record carries valid integer SortData fields \"J\", \"Xsoft\", and \"Xhard\".";
+SewingStaticXPower::usage =
+  "SewingStaticXPower[record] returns the number of static x-type closed heavy-pair factors visible in a sewing record. The current rule reads SortData and counts Xhard only in the closed J=0 channel.";
+SewingRelativeChiralOrder::usage =
+  "SewingRelativeChiralOrder[record] returns the relative chiral-order sorting label dAmp - nStaticX - J read from explicit sewing metadata. It does not include any sector-dependent additive offset.";
+SewingChiralSortKey::usage =
+  "SewingChiralSortKey[record] returns a stable key for table-level chiral sorting: relative chiral-order label, amplitude dimension, J, static/recoil/open priority, and the existing basis sort key.";
+SewingSortRecordsByChiralOrder::usage =
+  "SewingSortRecordsByChiralOrder[records] sorts sewing records by SewingChiralSortKey and fails if required SortData or AmpDim metadata is missing.";
 SewingBasisSortKey::usage =
   "SewingBasisSortKey[record] returns the fixed priority key used for independent sewing basis selection: lower J, then higher Xsoft, then higher Xhard.";
 SewingSortRecordsForBasis::usage =
   "SewingSortRecordsForBasis[records] sorts sewing records using explicit SortData metadata and fails if any record has missing or invalid SortData.";
 SewingIndependentBlockFromRecords::usage =
-  "SewingIndependentBlockFromRecords[records, basis] reduces sewn records to a rank-maximal independent block and returns {basisRecords, coefficientMatrix, reducedMonomialBasis}. If basis is Automatic, it is built from reduced monomials.";
+  "SewingIndependentBlockFromRecords[records, basis] reduces sorted sewn records to a rank-maximal independent block and returns {basisAmplitudes, coefficientMatrix, reducedMonomialBasis}. With ReturnRecords -> True it returns an association containing the selected records, positions, matrix, and monomial basis. If basis is Automatic, it is built from reduced monomials.";
 SewingCoeffMatrixDataUnion::usage =
   "SewingCoeffMatrixDataUnion[records, basis] returns an association containing the coefficient matrix, rank, reduced amplitudes, and monomial basis for a list of sewing records.";
 CompareGeneralSewingToCFBlocks::usage =
@@ -620,13 +632,13 @@ ConstructRightProjectedJResidualRecords[
   ];
   If[raw === $Failed || ! ListQ[raw], Return[{}]];
   SewingLog[debug, "RightProjected.Raw", <|"RawCount" -> Length[raw], "Target" -> leftJTarget|>];
-  decorate[rec_] := Module[{amp = rec["AuxiliaryAmp"], projectedAmp, jCounts},
-    projectedAmp = SewingProjectAuxiliaryLabels[amp, auxLabels, jLabel];
+  decorate[rec_] := Module[{projectedAmp, jCounts},
+    projectedAmp = rec["AmpR"];
     jCounts = SewingJCounts[projectedAmp];
     Join[
       rec,
       <|
-        "RawAmpR" -> rec["AmpR"],
+        "RawAmpR" -> rec["AuxiliaryAmp"],
         "AmpR" -> projectedAmp,
         "ProjectedAmpR" -> projectedAmp,
         "ProjectedJCounts" -> jCounts,
@@ -744,19 +756,26 @@ SewingOpenPairMonomials[m_Integer?NonNegative, np_: Automatic] := Module[
   ]
 ];
 
+SewingBalancedOpenPairQ[open_Association] := Module[{p = open["OpenPowers"]},
+  Lookup[p, "Angle1", 0] + Lookup[p, "Angle2", 0] ===
+    Lookup[p, "Square1", 0] + Lookup[p, "Square2", 0]
+];
+
 ConstructLeft3PointOpenBasis[spinJ_Integer?NonNegative, OptionsPattern[]] := Module[
   {
     spin = OptionValue[MassiveSpin], pointCount = OptionValue[PointCount],
-    qSpec = OptionValue[QReplacement], nSlots, openSlots, closedSlots, qPower,
+    qSpec = OptionValue[QReplacement], nSlots, openSlots, closedSlots, qExponent, qPower,
     closed, open, records
   },
   nSlots = 2 spin;
   If[! IntegerQ[nSlots] || nSlots < 0, Return[{}]];
   openSlots = Min[spinJ, nSlots];
   closedSlots = nSlots - openSlots;
-  qPower = (ab[Q, J] sb[Q, J])^Max[spinJ - nSlots, 0];
+  qExponent = Max[spinJ - nSlots, 0];
+  qPower = (ab[Q, J] sb[Q, J])^qExponent;
   closed = SewingClosedPairMonomials[closedSlots, pointCount];
   open = SewingOpenPairMonomials[openSlots, pointCount];
+  If[qExponent == 0, open = Select[open, SewingBalancedOpenPairQ]];
   records = Flatten@Table[
     <|
       "J" -> spinJ,
@@ -947,6 +966,46 @@ SewingSortDataQ[rec_Association] := Module[
   xs = Lookup[data, "Xsoft", Missing["Absent"]];
   xh = Lookup[data, "Xhard", Missing["Absent"]];
   IntegerQ[j] && j >= 0 && IntegerQ[xs] && xs >= 0 && IntegerQ[xh] && xh >= 0
+];
+
+SewingStaticXPower[rec_Association] := Module[{data = SewingSortData[rec]},
+  If[! TrueQ[SewingSortDataQ[rec]], Return[$Failed]];
+  If[data["J"] === 0, data["Xhard"], 0]
+];
+
+SewingRelativeChiralOrder[rec_Association] := Module[{ampDim, data, staticX},
+  ampDim = Lookup[rec, "AmpDim", Missing["Absent"]];
+  data = SewingSortData[rec];
+  staticX = SewingStaticXPower[rec];
+  If[! IntegerQ[ampDim] || ! AssociationQ[data] || staticX === $Failed, Return[$Failed]];
+  ampDim - staticX - data["J"]
+];
+
+SewingChiralSortKey[rec_Association] := Module[{data = SewingSortData[rec], order, staticX, kindPriority},
+  order = SewingRelativeChiralOrder[rec];
+  staticX = SewingStaticXPower[rec];
+  If[order === $Failed || staticX === $Failed, Return[$Failed]];
+  kindPriority = Which[
+    data["J"] === 0 && staticX > 0, 0,
+    data["J"] === 0, 1,
+    True, 2
+  ];
+  {
+    order,
+    Lookup[rec, "AmpDim", 0],
+    data["J"],
+    kindPriority,
+    SewingBasisSortKey[rec]
+  }
+];
+
+SewingSortRecordsByChiralOrder[records_List] := Module[{bad},
+  bad = Select[records, SewingChiralSortKey[#] === $Failed &];
+  If[bad =!= {},
+    Message[SewingSortRecordsByChiralOrder::metadata];
+    Return[$Failed]
+  ];
+  SortBy[records, SewingChiralSortKey]
 ];
 
 SewingBasisSortKey[rec_Association] := Module[
@@ -1291,15 +1350,30 @@ ConstructGeneralSewingAmplitudeRecords[
   rows
 ];
 
-SewingIndependentBlockFromRecords[records_List, basis_: Automatic] := Module[
-  {monoms, reduced, matrix, posIndep},
-  If[Length[records] == 0, Return[{}]];
+Options[SewingIndependentBlockFromRecords] = {ReturnRecords -> False};
+SewingIndependentBlockFromRecords[records_List, basis_: Automatic, OptionsPattern[]] := Module[
+  {monoms, reduced, matrix, posIndep, selected, empty},
+  empty = If[TrueQ[OptionValue[ReturnRecords]],
+    <|"Records" -> {}, "Amplitudes" -> {}, "Matrix" -> {}, "Monomials" -> {}, "Positions" -> {}|>,
+    {}
+  ];
+  If[Length[records] == 0, Return[empty]];
   reduced = Lookup[records, "ReducedAmp", {}];
   monoms = Replace[basis, Automatic -> Poly2Singlet[reduced]];
-  If[Length[monoms] == 0, Return[{}]];
+  If[Length[monoms] == 0, Return[empty]];
   matrix = Table[Coefficient[Expand[row], monom], {row, reduced}, {monom, monoms}];
   posIndep = FindIndependentBasisPos[matrix];
-  {records[[posIndep, "TotalAmp"]], matrix[[posIndep]], monoms}
+  selected = records[[posIndep]];
+  If[TrueQ[OptionValue[ReturnRecords]],
+    <|
+      "Records" -> selected,
+      "Amplitudes" -> selected[[All, "TotalAmp"]],
+      "Matrix" -> matrix[[posIndep]],
+      "Monomials" -> monoms,
+      "Positions" -> posIndep
+    |>,
+    {selected[[All, "TotalAmp"]], matrix[[posIndep]], monoms}
+  ]
 ];
 
 Options[SewingCoeffMatrixDataUnion] = {};
@@ -1575,8 +1649,3 @@ ConstructIndepSewingBlock[
   SewingLog[debug, "Independent.Done", <|"InputRecords" -> Length[records], "BlockRows" -> If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], 0]|>];
   block
 ];
-
-
-
-
-

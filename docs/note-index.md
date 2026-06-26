@@ -18,6 +18,11 @@ Finite-sector rank-scan evidence for the auxiliary construction.
 
 Corrected witness note for the \((\bar B,B,u,f_+)=(1,2,3,4)\) sector.
 
+* `notes/section_5_2_relative_chiral_order_reproduction.md`
+
+Executable reproduction note for the relative chiral-order sorting rule
+`AmpDim - XPower - J`, including the absence of `ampDim=4,J=1`.
+
 ## Keep as Proof-Status Notes
 
 * `notes/sewing_relative_completeness_proof_note.md`
