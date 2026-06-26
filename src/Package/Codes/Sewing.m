@@ -3,7 +3,7 @@
 LogPri["Sewing Loaded"];
 
 ClearAll[
-  SewingJCounts, SewingCountsMatchQ,
+  SewingJFactorQ, SewingJCounts, SewingCountsMatchQ,
   SewingClosedPairMonomials, SewingOpenPairMonomials,
   ConstructLeft3PointOpenBasis,
   SewingQSingleFactor, SewingApplyLeftQReplacement,
@@ -95,7 +95,7 @@ CompareGeneralSewingToCFBlocks::cf =
   "CF comparison failed for spin sector `1`, codeDim `2`, polarization `3`, mass `4`.";
 
 SewingJFactorQ[head_][factor_] :=
-  MatchQ[factor, head[J, _] | head[_, J]];
+  MatchQ[factor, _[_, _]] && Head[factor] === head && MemberQ[List @@ factor, J];
 
 SewingJCounts[amp_] := Module[{termCounts},
   termCounts = DeleteDuplicates[
