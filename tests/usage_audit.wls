@@ -15,6 +15,8 @@ publicSymbols = {
   ConstructGeneralSewingAmplitudeRecords,
   ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
+  SewingContractionTerms,
+  SymmetricSewContract,
   SewingSortRecordsForBasis,
   SewingStaticXPower,
   SewingRelativeChiralOrder,
@@ -27,7 +29,8 @@ publicSymbols = {
   RightMass,
   LeftMass,
   QReplacement,
-  PointCount
+  PointCount,
+  SewingContractionMode
 };
 
 missingUsage = Select[
@@ -45,6 +48,7 @@ messageSymbols = {
   ConstructGeneralSewingAmplitudeRecords::args,
   ConstructGeneralSewingAmplitudeRecords::ampdim,
   ConstructGeneralSewingAmplitudeRecords::check,
+  ConstructGeneralSewingAmplitudeRecords::mode,
   ConstructIndepSewingBlock::cfcheck,
   ConstructIndepSewingBlock::indcheck,
   ConstructIndepSewingBlock::records,

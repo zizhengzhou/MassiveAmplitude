@@ -114,22 +114,23 @@ keys = AssociationMap[
   {2, 3, 4}
 ];
 
-expectedSummary = <|2 -> 3, 3 -> 4, 4 -> 5|>;
+expectedSummary = <|2 -> 4, 3 -> 6, 4 -> 3|>;
 expectedKeys = <|
   2 -> {
     <|"AmpDim" -> 3, "J" -> 1, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 2|>,
     <|"AmpDim" -> 3, "J" -> 1, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 2|>,
+    <|"AmpDim" -> 4, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 2|>,
     <|"AmpDim" -> 4, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 2|>
   },
   3 -> {
     <|"AmpDim" -> 4, "J" -> 0, "Kind" -> "x", "XPower" -> 1, "RelativeOrder" -> 3|>,
     <|"AmpDim" -> 5, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,
     <|"AmpDim" -> 5, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,
+    <|"AmpDim" -> 5, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,
+    <|"AmpDim" -> 6, "J" -> 3, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,
     <|"AmpDim" -> 6, "J" -> 3, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>
   },
   4 -> {
-    <|"AmpDim" -> 4, "J" -> 0, "Kind" -> "y", "XPower" -> 0, "RelativeOrder" -> 4|>,
-    <|"AmpDim" -> 5, "J" -> 1, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 4|>,
     <|"AmpDim" -> 5, "J" -> 1, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 4|>,
     <|"AmpDim" -> 6, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 4|>,
     <|"AmpDim" -> 6, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 4|>

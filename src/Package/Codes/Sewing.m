@@ -12,7 +12,7 @@ ClearAll[
   CompareRightResidualBackends, SewingAuxiliaryAmpToFormalJ, SewingAuxiliaryAmpToFormalJCandidates,
   ConstructRightAuxiliaryOnShellRecords, CompareRightAuxiliaryOnShellToDirectJ,
   SewingProjectAuxiliaryLabels, SewingNormalizeJTarget, ConstructRightProjectedJResidualRecords,
-  SymmetricSewContract,
+  SewingContractMonomialTerms, SewingContractionTerms, SymmetricSewContract,
   ConstructGeneralSewingAmplitudeRecords, ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
   SewingReducedMassless, SewingReducedMasslessGeneral,
@@ -54,8 +54,12 @@ ConstructRightProjectedJResidualRecords::usage =
   "ConstructRightProjectedJResidualRecords[leftJTarget, rightSpins, rightMass, rightPolarization, rightAmpDim, opts] constructs right residual records from auxiliary particles, projects them to the formal J slot, removes vanishing projections, and filters the survivors by separate J-angle and J-square counts.";
 CompareRightAuxiliaryOnShellToDirectJ::usage =
   "CompareRightAuxiliaryOnShellToDirectJ[target, nCols] compares balanced auxiliary on-shell records against direct formal-J residual records.";
+SewingContractMonomialTerms::usage =
+  "SewingContractMonomialTerms[monomialL, monomialR] returns the individual fully symmetric J-slot contraction terms for one left/right monomial pair.";
+SewingContractionTerms::usage =
+  "SewingContractionTerms[ampL, ampR] returns the expanded list of individual fully symmetric J-slot contraction terms before summing them.";
 SymmetricSewContract::usage =
-  "SymmetricSewContract[ampL, ampR] contracts all J slots by summing over all permutations, retaining duplicate permutations.";
+  "SymmetricSewContract[ampL, ampR] contracts all J slots by summing over all fully symmetric contraction terms. Use SewingContractionTerms to keep the terms split.";
 ConstructGeneralSewingAmplitudeRecords::usage =
   "ConstructGeneralSewingAmplitudeRecords[leftSpin, rightSpins, ampDim, rightPolarization, opts] constructs sewn amplitude records for an equal-spin left current and a physical right residual sector. Each record carries `AmpL`, `AmpR`, `TotalAmp`, `ReducedAmp`, left/right provenance, `SortData`, and `QReplacement`. `QReplacement` may be a symbol (kept symbolic), an integer label, or a signed list such as `{1,2}` or `{1,-2}` interpreted termwise in `(<QJ>[QJ])^n`.";
 ConstructGeneralSewingAmplitudeRecords::ampdim =
@@ -64,6 +68,8 @@ ConstructGeneralSewingAmplitudeRecords::args =
   "Invalid sewing input: full point count `1`, right spin count `2`, and right polarization length `3`.";
 ConstructGeneralSewingAmplitudeRecords::check =
   "Sewing construction check failed: `1`.";
+ConstructGeneralSewingAmplitudeRecords::mode =
+  "Unsupported SewingContractionMode `1`. Use \"Split\" or \"Sum\".";
 ConstructIndepSewingBlock::usage =
   "ConstructIndepSewingBlock[leftSpin, rightSpins, ampDim, rightPolarization, opts] returns `{basis, coefficientMatrix, reducedMonomialBasis}` for the independent sewn basis after fixed priority sorting by lower `J`, then higher `Xsoft`, then higher `Xhard`. With `CheckAgainstCF -> True`, the sewn span is validated against `ConstructIndepCFBlock`.";
 ConstructIndepSewingBlock::cfcheck =
@@ -843,31 +849,39 @@ ClearAll[SewingJOtherLabel];
 SewingJOtherLabel[head_[a_, J]] := a;
 SewingJOtherLabel[head_[J, b_]] := b;
 
-ClearAll[SewingContractMonomial];
-SewingContractMonomial[ampL_, ampR_] := Module[
-  {leftFactors, rightFactors, allFactors, nonJFactors, leftSlots, rightSlots, contractHead},
+ClearAll[SewingContractMonomialTerms, SewingContractMonomial];
+SewingContractMonomialTerms[ampL_, ampR_] := Module[
+  {leftFactors, rightFactors, allFactors, nonJFactors, contractHeadTerms, abTerms, sbTerms},
   leftFactors = Prod2List[ampL];
   rightFactors = Prod2List[ampR];
   allFactors = Join[leftFactors, rightFactors];
   nonJFactors = Select[allFactors, !(MatchQ[#, _ab | _sb] && MemberQ[List @@ #, J]) &];
-  contractHead[head_] := Module[{left, right, n},
+  contractHeadTerms[head_] := Module[{left, right, n},
     left = SewingJOtherLabel /@
       Select[leftFactors, MatchQ[#, _[_, _]] && Head[#] === head && MemberQ[List @@ #, J] &];
     right = SewingJOtherLabel /@
       Select[rightFactors, MatchQ[#, _[_, _]] && Head[#] === head && MemberQ[List @@ #, J] &];
     n = Length[left];
-    If[n =!= Length[right], Return[0]];
-    If[n == 0, Return[1]];
-    Total[Times @@@ (MapThread[head, {left, right[[#]]}] & /@ Permutations[Range[n]])]
+    If[n =!= Length[right], Return[{}]];
+    If[n == 0, Return[{1}]];
+    Times @@@ (MapThread[head, {left, right[[#]]}] & /@ Permutations[Range[n]])
   ];
-  Expand[(Times @@ nonJFactors) contractHead[ab] contractHead[sb]]
+  abTerms = contractHeadTerms[ab];
+  sbTerms = contractHeadTerms[sb];
+  If[abTerms === {} || sbTerms === {}, Return[{}]];
+  DeleteCases[Expand[(Times @@ nonJFactors) #1 #2] & @@@ Tuples[{abTerms, sbTerms}], 0]
 ];
+SewingContractMonomial[ampL_, ampR_] := Expand[Total[SewingContractMonomialTerms[ampL, ampR]]];
 
 Options[SymmetricSewContract] = {};
-SymmetricSewContract[ampL_, ampR_, OptionsPattern[]] := Module[{leftTerms, rightTerms},
+SewingContractionTerms[ampL_, ampR_] := Module[{leftTerms, rightTerms},
   leftTerms = Sum2List[Expand[ampL]];
   rightTerms = Sum2List[Expand[ampR]];
-  Expand[Total[Flatten@Table[SewingContractMonomial[l, r], {l, leftTerms}, {r, rightTerms}]]]
+  DeleteCases[Flatten@Table[SewingContractMonomialTerms[l, r], {l, leftTerms}, {r, rightTerms}], 0]
+];
+SymmetricSewContract[ampL_, ampR_, OptionsPattern[]] := Module[{terms},
+  terms = SewingContractionTerms[ampL, ampR];
+  Expand[Total[terms]]
 ];
 
 Options[SewingReducedMassless] = {
@@ -1017,7 +1031,9 @@ SewingBasisSortKey[rec_Association] := Module[
     Lookup[rec, "LeftStructure", ""],
     ToString[Lookup[rec, "QComponent", {}], InputForm],
     Lookup[rec, "AuxiliarySpin", {}],
-    ToString[Lookup[rec, "AmpR", 0], InputForm]
+    ToString[Lookup[rec, "AmpR", 0], InputForm],
+    Lookup[rec, "ContractionMode", ""],
+    Lookup[rec, "ContractionTermIndex", 0]
   }
 ];
 
@@ -1149,6 +1165,7 @@ Options[ConstructGeneralSewingAmplitudeRecords] = Join[
     AuxiliarySpinRange -> Automatic,
     EqualAuxiliarySpin -> True,
     QReplacement -> 2,
+    SewingContractionMode -> "Split",
     VerifyAmpDim -> True,
     Check3Point -> False,
     CheckRight -> False,
@@ -1186,7 +1203,7 @@ ConstructGeneralSewingAmplitudeRecords[
 ] := Module[
   {
     npFull, npRight, rightMassData, rightMass, jRangeOpt, jMaxOpt, jRange,
-    leftRecords, rightRecordsFor, rightRecords, rows, reducedOpts, key, qSpec,
+    leftRecords, rightRecordsFor, rightRecords, rows, reducedOpts, key, qSpec, contractionMode,
     leftChecks, failedChecks, cfPolarizations, debug
   },
   debug = TrueQ[OptionValue[SewingDebug]];
@@ -1206,6 +1223,11 @@ ConstructGeneralSewingAmplitudeRecords[
     True, Range[0, SewingDefaultJMax[leftSpin, ampDim, rightSpins]]
   ];
   qSpec = OptionValue[QReplacement];
+  contractionMode = OptionValue[SewingContractionMode];
+  If[! MemberQ[{"Split", "Sum"}, contractionMode],
+    Message[ConstructGeneralSewingAmplitudeRecords::mode, contractionMode];
+    Return[$Failed]
+  ];
   SewingLog[
     debug,
     "General.Start",
@@ -1276,7 +1298,15 @@ ConstructGeneralSewingAmplitudeRecords[
     rightRecords = rightRecordsFor[left];
     Table[
       If[! SewingRightJCountsMatchQ[left["AmpL"], right["AmpR"]], Nothing,
-        Module[{total = SymmetricSewContract[left["AmpL"], right["AmpR"]], rec, check},
+        Module[{totals, total, rec, check},
+          totals = Switch[
+            contractionMode,
+            "Sum", {SymmetricSewContract[left["AmpL"], right["AmpR"]]},
+            "Split", SewingContractionTerms[left["AmpL"], right["AmpR"]]
+          ];
+          If[Length[totals] == 0, Nothing,
+          Table[
+          total = totals[[termIndex]];
           If[TrueQ[OptionValue[CheckRight]],
             check = SewingRightRecordCheck[left, right, right["RightAmpDim"]];
             If[SewingCheckFailureQ[check],
@@ -1310,6 +1340,9 @@ ConstructGeneralSewingAmplitudeRecords[
               "SortData" -> left["SortData"],
               "QComponent" -> left["QComponent"],
               "QReplacement" -> Lookup[left, "QReplacement", None],
+              "ContractionMode" -> contractionMode,
+              "ContractionTermIndex" -> termIndex,
+              "ContractionTermCount" -> Length[totals],
               "OpenAmpL" -> left["OpenAmpL"],
               "ClosedBasisAmpL" -> left["ClosedBasisAmpL"],
               "AuxiliarySpin" -> right["AuxiliarySpin"],
@@ -1332,6 +1365,8 @@ ConstructGeneralSewingAmplitudeRecords[
               ],
               rec
             ]
+          ],
+          {termIndex, Length[totals]}]
           ]
         ]
       ],
@@ -1343,7 +1378,7 @@ ConstructGeneralSewingAmplitudeRecords[
   SewingLog[debug, "General.Rows", <|"RowsBeforeDedup" -> Length[rows]|>];
   key[rec_] := If[TrueQ[OptionValue[DeduplicateByReducedAmp]],
     ToString[rec["ReducedAmp"], InputForm],
-    ToString[{rec["J"], rec["LeftStructure"], rec["QComponent"], rec["AuxiliarySpin"], rec["AmpL"], rec["AmpR"]}, InputForm]
+    ToString[{rec["J"], rec["LeftStructure"], rec["QComponent"], rec["AuxiliarySpin"], rec["AmpL"], rec["AmpR"], rec["ContractionMode"], rec["ContractionTermIndex"]}, InputForm]
   ];
   rows = DeleteDuplicatesBy[rows, key];
   SewingLog[debug, "General.Done", <|"Rows" -> Length[rows]|>];

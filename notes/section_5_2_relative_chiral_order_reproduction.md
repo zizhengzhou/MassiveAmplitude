@@ -40,6 +40,20 @@ The global table is not obtained by independently reducing each fixed
 2. sort them by `SewingChiralSortKey`;
 3. add rows greedily only when the reduced coefficient rank increases.
 
+The default contraction mode is now
+
+```wl
+SewingContractionMode -> "Split"
+```
+
+so one left/right sewing pair may produce several records, one for each
+individual fully symmetric contraction term.  The old one-left-one-right
+summed behavior is still available with
+
+```wl
+SewingContractionMode -> "Sum"
+```
+
 This is the same filtration logic as the table-level chiral-order comparison:
 earlier relative order has priority, and higher-dimensional check rows only
 enter when they add a genuinely new reduced direction.
@@ -66,18 +80,19 @@ after this correction.  The valid leading `ampDim=4` open-current row is the
 
 The witness test gives the following relative-order blocks.
 
-| relative order | count | sources |
+| relative order | split-term count | sources |
 | --- | ---: | --- |
-| 2 | 3 | two `ampDim=3,J=1` rows and one `ampDim=4,J=2` row |
-| 3 | 4 | one static `ampDim=4,J=0` row, two `ampDim=5,J=2` rows, and one `ampDim=6,J=3` row |
-| 4 | 5 | one recoil `ampDim=4,J=0` row, two `ampDim=5,J=1` rows, and two `ampDim=6,J=2` rows |
+| 2 | 4 | two `ampDim=3,J=1` rows and two split `ampDim=4,J=2` terms |
+| 3 | 6 | one static `ampDim=4,J=0` row, three split `ampDim=5,J=2` terms, and two split `ampDim=6,J=3` terms |
+| 4 | 3 | one `ampDim=5,J=1` row and two split `ampDim=6,J=2` terms |
 
 The key leading-order check is therefore exact:
 
 ```text
-relative order 2: 3 rows
+relative order 2: 4 split-term rows
   ampDim=3, J=1
   ampDim=3, J=1
+  ampDim=4, J=2
   ampDim=4, J=2
 ```
 

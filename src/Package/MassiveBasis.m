@@ -13,7 +13,7 @@ Print["Loading MassiveBasis..."];
 {SewingAuxiliaryAmpToFormalJ, SewingAuxiliaryAmpToFormalJCandidates};
 {ConstructRightAuxiliaryOnShellRecords, CompareRightAuxiliaryOnShellToDirectJ};
 {ConstructRightProjectedJResidualRecords};
-{SymmetricSewContract};
+{SewingContractionTerms, SymmetricSewContract};
 {ConstructGeneralSewingAmplitudeRecords, ConstructIndepSewingBlock, CompareGeneralSewingToCFBlocks};
 {SewingProjectAuxiliaryLabels, SewingNormalizeJTarget};
 {SewingIndependentBlockFromRecords, SewingCoeffMatrixDataUnion};
@@ -34,7 +34,7 @@ Print["Loading MassiveBasis..."];
   AuxiliaryLabels, AuxiliarySpinRange, EqualAuxiliarySpin, RightAntispinor,
   Target, CodeDim, RejectMasslessSelfColumns, ReturnRejected, RejectZeroProjection,
   RightSpins, MassiveSpin, PointCount, QReplacement, MasslessRule, EOMRules,
-  RightMass, LeftMass, JRange, JMax, VerifyAmpDim, Check3Point, CheckRight,
+  RightMass, LeftMass, JRange, JMax, SewingContractionMode, VerifyAmpDim, Check3Point, CheckRight,
   CheckSewing, CheckVerbose, FilterPhysicalSector, FilterByAmpDim,
   DeduplicateByReducedAmp, LeftPolarizationRange, CFPolarizations,
   FilterSewingByCFPolarization, CheckAgainstCF, SewingDebug
@@ -127,6 +127,7 @@ RightMass::usage = "RightMass is an option specifying the physical or auxiliary-
 LeftMass::usage = "LeftMass is an option specifying the two left heavy labels or mass vector.";
 JRange::usage = "JRange is an option specifying explicit left-current J values to scan.";
 JMax::usage = "JMax is an option specifying the maximum left-current J when JRange is Automatic.";
+SewingContractionMode::usage = "SewingContractionMode is an option for sewn-record construction. Use \"Split\" to keep individual symmetric contraction terms as separate records, or \"Sum\" to combine them into one record per left/right pair.";
 VerifyAmpDim::usage = "VerifyAmpDim is an option enabling sewn-amplitude bracket-dimension checks.";
 Check3Point::usage = "Check3Point is an option enabling consistency checks for left three-point records.";
 CheckRight::usage = "CheckRight is an option enabling consistency checks for projected right records.";

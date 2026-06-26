@@ -15,7 +15,10 @@ The working construction for an \(n\)-point amplitude is:
 4. Build the right auxiliary amplitudes with the CF-block-style SSYT machinery.
 5. Translate the two auxiliary labels back to formal \(J\)-slots and keep only
    nonzero records matching the required angular and square counts.
-6. Sew all \(J\)-slots symmetrically and expand the result into records.
+6. Sew all \(J\)-slots symmetrically.  By default
+   `SewingContractionMode -> "Split"` keeps each symmetric contraction term as
+   a separate record; `SewingContractionMode -> "Sum"` restores the older
+   one-left-one-right summed record.
 7. Reduce the sewn records with the fixed priority order: lower \(J\), then
    higher `Xsoft`, then higher `Xhard`.
 8. Validate spans against `ConstructIndepCFBlock` through rank equality.
