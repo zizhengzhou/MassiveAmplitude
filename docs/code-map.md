@@ -4,9 +4,12 @@
 
 * `src/Package/Codes/Sewing.m`
 
-This file owns the new method.  It constructs left open-current records, right
-auxiliary records, projected formal-\(J\) residual records, symmetric sewing
-records, priority sorting metadata, independence extraction, and CF comparison.
+This file owns the new method.  The main public entry point is
+`ConstructProjectedSewingRelativeChiralBasis`.  Supporting functions construct
+left open-current records, right auxiliary records, projected formal-\(J\)
+residual records, symmetric sewing records, priority sorting metadata,
+independence extraction, CF comparison, identical projection, and SU(3) direct
+products.
 
 ## Minimal Dependencies
 
@@ -29,6 +32,11 @@ sewn amplitudes.
 
 Provides `ReplaceBraNumber` and permutation utilities needed by reduction and
 legacy CF logic.
+
+* `src/Package/Codes/SU3.m`
+
+Provides the legacy SU(3) color-basis and identical-permutation constructor
+used by `ConstructProjectedSewingRelativeChiralBasis`.
 
 * `src/Package/Codes/SSYT.m`
 

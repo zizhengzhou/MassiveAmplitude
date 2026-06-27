@@ -1,48 +1,135 @@
 # Sewing Method Code
 
-This repository isolates the current left-right sewing construction for
-heavy-pair local amplitudes from the surrounding Overleaf manuscript project.
+This repository packages the current left-right sewing construction for
+heavy-pair local amplitudes.  It is intended to be usable without the full
+Overleaf manuscript tree.
+
+## Main Entry Point
+
+The public interface for ordinary users is:
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin,
+  rightSpins,
+  ampDim,
+  identicalParam,
+  opts
+]
+```
+
+or, with explicit right-side massive labels:
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin,
+  rightSpins,
+  rightMass,
+  ampDim,
+  identicalParam,
+  opts
+]
+```
+
+The function returns an association keyed by relative chiral order.  Without
+color structures, each value is a list of symbolic Lorentz basis elements.  With
+`su3ShapeList`, each value is a list of associations containing
+`LorentzSymbolForm`, `SU3Basis`, `SU3IndexDictionary`, and `DirectProduct`.
+
+Use `ReturnProjectionData -> True` when debugging or validating a sector.  It
+returns the grouped basis plus sector records, CF/sewing ranks, Young operators,
+SU3 index dictionaries, and J-block diagnostics.
+
+## User Levels
+
+Most users should only call `ConstructProjectedSewingRelativeChiralBasis`.
+
+Expert users may inspect these supporting constructors:
+
+* `ConstructLeft3PointOpenBasis`
+* `ConstructRightProjectedJResidualRecords`
+* `ConstructGeneralSewingAmplitudeRecords`
+* `CompareGeneralSewingToCFBlocks`
+* `ConstructSewingRelativeChiralBasis`
+
+Lower-level permutation, reduction, and auxiliary construction functions are
+implementation details.  They are not a stable public API.
+
+## Quick Examples
+
+Load the package from the repository root:
+
+```wl
+Get[FileNameJoin[{"src", "Package", "Kernel", "init.m"}]];
+```
+
+Four-point example without identical particles:
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  1/2,
+  {1, 1},
+  {3},
+  4,
+  {}
+]
+```
+
+Same Lorentz problem with right-side identical projection:
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  1/2,
+  {1, 1},
+  {3},
+  4,
+  {{3, 4}}
+]
+```
+
+Attach an SU(3) singlet structure:
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  1/2,
+  {1, 1},
+  {3},
+  4,
+  {},
+  su3ShapeList -> {"", "", "q", "aq"}
+]
+```
 
 ## Current Method
 
-The working construction for an \(n\)-point amplitude is:
+For an \(n\)-point amplitude, the constructor uses this workflow:
 
 1. Construct the left \(\ell+\ell+J\) three-point open-current block directly.
 2. Construct the right block with two auxiliary massless particles plus the
    \(n-2\) physical right-side particles.
 3. Choose the auxiliary spin sector from the angular and square \(J\)-slot
    counts required by the left block.
-4. Build the right auxiliary amplitudes with the CF-block-style SSYT machinery.
-5. Translate the two auxiliary labels back to formal \(J\)-slots and keep only
-   nonzero records matching the required angular and square counts.
-6. Sew all \(J\)-slots symmetrically.  By default
+4. Translate auxiliary labels back to formal \(J\)-slots and keep nonzero
+   records matching the required angular and square counts.
+5. Sew all \(J\)-slots symmetrically.  The default
    `SewingContractionMode -> "Split"` keeps each symmetric contraction term as
-   a separate record; `SewingContractionMode -> "Sum"` restores the older
-   one-left-one-right summed record.
-7. Reduce the sewn records with the fixed priority order: lower \(J\), then
-   higher `Xsoft`, then higher `Xhard`.
-8. Validate spans against `ConstructIndepCFBlock` through rank equality.
+   a separate record.
+6. Reduce internal amp forms and compare the sewn span against the matching CF
+   block.
+7. Apply identical-particle Young projection on right-side identical groups.
+8. Optionally attach SU(3) structures by Lorentz/color direct product.
+9. Select independent representatives with `FindIndependentBasisPos`.
+10. Group final symbolic results by relative chiral order.
 
-## Layout
+## Documentation
 
-* `src/Package/Codes/Sewing.m`: current sewing implementation and public entry
-  points.
-* `src/Package/Codes/*.m`: minimal package dependencies copied from the old
-  amplitude package.
-* `tests/`: regression and data-generation scripts relevant to the sewing
-  method.
-* `notes/`: curated technical notes and proof-status notes.
-* `logs/`: retained witness logs for the most important scans.
-* `docs/`: local repository indexes and maintenance notes.
-
-## Primary Entry Points
-
-* `ConstructLeft3PointOpenBasis`
-* `ConstructRightProjectedJResidualRecords`
-* `SymmetricSewContract`
-* `ConstructGeneralSewingAmplitudeRecords`
-* `ConstructIndepSewingBlock`
-* `CompareGeneralSewingToCFBlocks`
+* `docs/api.md`: public and expert API surface.
+* `docs/physics-conventions.md`: spinor, mass, Q, X, identical, SU(3), and
+  relative chiral-order conventions.
+* `docs/testing.md`: maintained tests, note-generation scripts, and removed
+  probes.
+* `docs/release-checklist.md`: tasks before a public release.
+* `docs/benchmark-and-cache-plan.md`: performance benchmark and caching plan.
 
 ## Verification
 
@@ -52,7 +139,5 @@ From the repository root, run:
 wolframscript -file tests\run_all.wls
 ```
 
-The maintained regression entry point runs the package smoke test, usage audit,
-fixed-dimension Section 5.2 rank reproduction, and relative chiral-order
-reproduction.  The relative chiral-order witness is written to
-`logs/section_5_2_relative_chiral_orders.log`.
+This runs the maintained regression suite.  Development probes should not be
+added to `tests/run_all.wls` unless they become stable regression tests.

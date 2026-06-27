@@ -40,3 +40,14 @@ on-shell construction path in `Sewing.m`.
 * `notes/subagent_package_dependency_summary.md`
 
 These document older package dependencies and are retained as migration aids.
+
+## Package Preparation Docs
+
+* `docs/api.md`
+* `docs/physics-conventions.md`
+* `docs/testing.md`
+* `docs/release-checklist.md`
+* `docs/benchmark-and-cache-plan.md`
+
+These files describe the public package surface, conventions, testing policy,
+release preparation, and planned performance work.
