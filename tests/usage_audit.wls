@@ -15,7 +15,10 @@ publicSymbols = {
   ConstructGeneralSewingAmplitudeRecords,
   ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
+  ConstructSewingRelativeChiralBasis,
   SewingSymbolToAmpForm,
+  SewingReplaceQInSymbolForm,
+  SewingDisplayForm,
   SewingRecordSymbolForm,
   SewingRecordAmpForm,
   SewingContractionTerms,
@@ -33,7 +36,13 @@ publicSymbols = {
   LeftMass,
   QReplacement,
   PointCount,
-  SewingContractionMode
+  SewingContractionMode,
+  JRange,
+  JMax,
+  AutoJNoRightWindow,
+  ReturnRecords,
+  ReplaceQInFinalSymbolForm,
+  SewingOutputForm
 };
 
 missingUsage = Select[
@@ -55,6 +64,11 @@ messageSymbols = {
   ConstructIndepSewingBlock::cfcheck,
   ConstructIndepSewingBlock::indcheck,
   ConstructIndepSewingBlock::records,
+  ConstructSewingRelativeChiralBasis::cfcheck,
+  ConstructSewingRelativeChiralBasis::sort,
+  ConstructSewingRelativeChiralBasis::count,
+  SewingSymbolToAmpForm::badq,
+  SewingReplaceQInSymbolForm::badq,
   SewingSortRecordsForBasis::sortdata,
   SewingSortRecordsByChiralOrder::metadata,
   ConstructCFIByFakeDim::BelowDim,

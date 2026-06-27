@@ -14,8 +14,8 @@ Print["Loading MassiveBasis..."];
 {ConstructRightAuxiliaryOnShellRecords, CompareRightAuxiliaryOnShellToDirectJ};
 {ConstructRightProjectedJResidualRecords};
 {SewingContractionTerms, SymmetricSewContract};
-{ConstructGeneralSewingAmplitudeRecords, ConstructIndepSewingBlock, CompareGeneralSewingToCFBlocks};
-{SewingSymbolToAmpForm, SewingRecordSymbolForm, SewingRecordAmpForm};
+{ConstructGeneralSewingAmplitudeRecords, ConstructIndepSewingBlock, CompareGeneralSewingToCFBlocks, ConstructSewingRelativeChiralBasis};
+{SewingSymbolToAmpForm, SewingReplaceQInSymbolForm, SewingDisplayForm, SewingRecordSymbolForm, SewingRecordAmpForm};
 {SewingProjectAuxiliaryLabels, SewingNormalizeJTarget};
 {SewingIndependentBlockFromRecords, SewingCoeffMatrixDataUnion};
 {SewingSortData, SewingSortDataQ, SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder, SewingBasisSortKey, SewingSortRecordsForBasis};
@@ -38,7 +38,8 @@ Print["Loading MassiveBasis..."];
   RightMass, LeftMass, JRange, JMax, SewingContractionMode, VerifyAmpDim, Check3Point, CheckRight,
   CheckSewing, CheckVerbose, FilterPhysicalSector, FilterByAmpDim,
   DeduplicateByReducedAmp, LeftPolarizationRange, CFPolarizations,
-  FilterSewingByCFPolarization, CheckAgainstCF, SewingDebug, SewingOutputForm
+  FilterSewingByCFPolarization, CheckAgainstCF, SewingDebug, SewingOutputForm, ReturnRecords,
+  AutoJNoRightWindow, ReplaceQInFinalSymbolForm
 };
 {$MassiveVerbose, $SewingDebug, SewingLog};
 
@@ -108,7 +109,7 @@ prefix::usage = "prefix is an option specifying the prefix inserted before each 
 suffix::usage = "suffix is an option specifying the suffix inserted after each TeX array row.";
 MassiveSpin::usage = "MassiveSpin is an option specifying the equal heavy-pair spin used by the left three-point current constructor.";
 PointCount::usage = "PointCount is an option specifying the full physical point count used for massive-label relabeling and reduction.";
-QReplacement::usage = "QReplacement is an option controlling how the left-current Q label is replaced before sewing.";
+QReplacement::usage = "QReplacement is an option controlling how the left-current Q label is replaced before sewing. The sewing default is {1,-2}, i.e. Q = p1 - p2.";
 Labels::usage = "Labels is an option specifying the ordered label set used by residual SSYT enumeration.";
 PhysicalLabels::usage = "PhysicalLabels is an option specifying physical right-side labels in residual enumeration.";
 SupplementLabels::usage = "SupplementLabels is an option specifying supplemental labels used before projection to J.";
@@ -126,8 +127,8 @@ RejectZeroProjection::usage = "RejectZeroProjection is an option dropping record
 RightSpins::usage = "RightSpins is an option specifying physical right-side spins for backend comparison helpers.";
 RightMass::usage = "RightMass is an option specifying the physical or auxiliary-construction mass convention for the right side.";
 LeftMass::usage = "LeftMass is an option specifying the two left heavy labels or mass vector.";
-JRange::usage = "JRange is an option specifying explicit left-current J values to scan.";
-JMax::usage = "JMax is an option specifying the maximum left-current J when JRange is Automatic.";
+JRange::usage = "JRange is an option specifying explicit left-current J values to scan. When JRange and JMax are both Automatic, sewing constructors use automatic J scanning.";
+JMax::usage = "JMax is an option specifying the maximum left-current J when JRange is Automatic. When JMax is Automatic too, sewing constructors use automatic J scanning with AutoJNoRightWindow and an internal hard cap.";
 SewingContractionMode::usage = "SewingContractionMode is an option for sewn-record construction. Use \"Split\" to keep individual symmetric contraction terms as separate records, or \"Sum\" to combine them into one record per left/right pair.";
 VerifyAmpDim::usage = "VerifyAmpDim is an option enabling sewn-amplitude bracket-dimension checks.";
 Check3Point::usage = "Check3Point is an option enabling consistency checks for left three-point records.";
@@ -144,6 +145,9 @@ CFPolarizations::usage = "CFPolarizations is an option specifying full polarizat
 FilterSewingByCFPolarization::usage = "FilterSewingByCFPolarization is an option restricting sewn records to sectors visible in the CF comparison.";
 CheckAgainstCF::usage = "CheckAgainstCF is an option causing ConstructIndepSewingBlock to validate sewn span rank against CF blocks.";
 SewingOutputForm::usage = "SewingOutputForm is an option selecting whether independent sewing basis amplitudes are returned in \"SymbolForm\" or \"AmpForm\".";
+ReturnRecords::usage = "ReturnRecords is an option for independent sewing basis constructors. When True, return an association with selected records, amplitudes, matrix, monomials, and positions instead of only the basis triple.";
+AutoJNoRightWindow::usage = "AutoJNoRightWindow is an option specifying how many consecutive J sectors with no right-side records stop the automatic sewing J scan.";
+ReplaceQInFinalSymbolForm::usage = "ReplaceQInFinalSymbolForm is an option for ConstructSewingRelativeChiralBasis. When True, final symbolic output replaces Q by QReplacement while preserving Xhard and Xsoft.";
 
 If[!Global`$DEBUG, Begin["`Private`"]];
 

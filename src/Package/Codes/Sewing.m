@@ -8,7 +8,7 @@ ClearAll[
   SewingBalancedOpenPairQ,
   ConstructLeft3PointOpenBasis,
   SewingQLabelQ, SewingXSymbolQ, SewingContainsXSymbolQ, SewingDisplayForm,
-  SewingQSingleFactor, SewingApplyLeftQReplacement, SewingSymbolToAmpForm,
+  SewingQSingleFactor, SewingApplyLeftQReplacement, SewingSymbolToAmpForm, SewingReplaceQInSymbolForm,
   SewingRecordSymbolForm, SewingRecordAmpForm,
   SewingRightResidualRecordsDirect, SewingRightResidualRecordsAuxiliary,
   CompareRightResidualBackends, SewingAuxiliaryAmpToFormalJ, SewingAuxiliaryAmpToFormalJCandidates,
@@ -30,17 +30,22 @@ ClearAll[
   SewingProjectAuxiliaryLabels, SewingNormalizeJTarget,
   SewingSortData, SewingSortDataQ,
   SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder,
-  SewingBasisSortKey, SewingSortRecordsForBasis
+  SewingBasisSortKey, SewingSortRecordsForBasis,
+  ConstructSewingRelativeChiralBasis
 ];
 
 ConstructLeft3PointOpenBasis::usage =
   "ConstructLeft3PointOpenBasis[J, opts] returns association records for equal-spin massive-massive-current three-point structures with open J slots. The result records include symbolic left form `AmpLSymbolForm`, internal spinor form `AmpLAmpForm`, compatibility key `AmpL`, and explicit sorting metadata `SortData = <|\"J\", \"Xhard\", \"Xsoft\"|>`. Options include `MassiveSpin`, `PointCount`, and `QReplacement`.";
 SewingSymbolToAmpForm::usage =
   "SewingSymbolToAmpForm[expr, np, qSpec] converts display-level `Xhard`, `Xsoft`, and `Q` factors into the spinor-helicity amp form used internally. The default qSpec is {1, -2}, i.e. Q = p1 - p2.";
+SewingReplaceQInSymbolForm::usage =
+  "SewingReplaceQInSymbolForm[expr, qSpec] replaces only formal `Q` bracket pairs in a symbolic/display expression, preserving `Xhard` and `Xsoft`. The default qSpec is {1, -2}.";
 SewingRecordSymbolForm::usage =
   "SewingRecordSymbolForm[record] returns the preferred display form of a sewing record, using `SewingSymForm` when present and falling back to legacy amplitude keys.";
 SewingRecordAmpForm::usage =
   "SewingRecordAmpForm[record] returns the internal spinor-helicity amp form of a sewing record, using `SewingAmpForm` when present and falling back to legacy amplitude keys.";
+SewingDisplayForm::usage =
+  "SewingDisplayForm[expr, np] converts internal left square placeholders to the massive square labels for an explicit np-point amplitude. The np argument is required.";
 SewingRightResidualRecordsDirect::usage =
   "SewingRightResidualRecordsDirect[target, nCols] enumerates right-side residual SSYT records from explicit angular/square target counts.";
 SewingRightResidualRecordsAuxiliary::usage =
@@ -70,7 +75,7 @@ SewingContractionTerms::usage =
 SymmetricSewContract::usage =
   "SymmetricSewContract[ampL, ampR] contracts all J slots by summing over all fully symmetric contraction terms. Use SewingContractionTerms to keep the terms split.";
 ConstructGeneralSewingAmplitudeRecords::usage =
-  "ConstructGeneralSewingAmplitudeRecords[leftSpin, rightSpins, ampDim, rightPolarization, opts] constructs sewn amplitude records for an equal-spin left current and a physical right residual sector. Each record carries display-level `SewingSymForm`, internal `SewingAmpForm`, reduced `ReducedAmp`, left/right provenance, `SortData`, and `QReplacement`. Compatibility keys `AmpL` and `TotalAmp` keep the internal amp form.";
+  "ConstructGeneralSewingAmplitudeRecords[leftSpin, rightSpins, ampDim, rightPolarization, opts] constructs sewn amplitude records for an equal-spin left current and a physical right residual sector. Each record carries display-level `SewingSymForm`, internal `SewingAmpForm`, reduced `ReducedAmp`, left/right provenance, `SortData`, and `QReplacement`. The default `QReplacement -> {1,-2}` uses Q = p1 - p2. With automatic `JRange` and `JMax`, the constructor scans J until `AutoJNoRightWindow` consecutive J sectors have no right-side records, with a hard internal search cap.";
 ConstructGeneralSewingAmplitudeRecords::ampdim =
   "Internal sewing dimension mismatch for J=`1`, left degree data `2`, right ampDim `3`. The sewn amplitude has bracket degrees `4`, but expected ampDim `5`.";
 ConstructGeneralSewingAmplitudeRecords::args =
@@ -80,7 +85,7 @@ ConstructGeneralSewingAmplitudeRecords::check =
 ConstructGeneralSewingAmplitudeRecords::mode =
   "Unsupported SewingContractionMode `1`. Use \"Split\" or \"Sum\".";
 ConstructIndepSewingBlock::usage =
-  "ConstructIndepSewingBlock[leftSpin, rightSpins, ampDim, rightPolarization, opts] returns `{basis, coefficientMatrix, reducedMonomialBasis}` for the independent sewn basis after fixed priority sorting by lower `J`, then higher `Xsoft`, then higher `Xhard`. With `CheckAgainstCF -> True`, the sewn span is validated against `ConstructIndepCFBlock`.";
+  "ConstructIndepSewingBlock[leftSpin, rightSpins, ampDim, rightPolarization, opts] returns `{basis, coefficientMatrix, reducedMonomialBasis}` for the independent sewn basis after fixed priority sorting by lower `J`, then higher `Xsoft`, then higher `Xhard`. With `CheckAgainstCF -> True`, the sewn span is validated against `ConstructIndepCFBlock`. With `ReturnRecords -> True`, it returns an association containing the selected records, amplitudes, matrix, monomials, and positions.";
 ConstructIndepSewingBlock::cfcheck =
   "Sewing span is not complete against CF blocks. CF rank `1`, sewing rank `2`, joined rank `3`.";
 ConstructIndepSewingBlock::indcheck =
@@ -92,6 +97,8 @@ SewingSortRecordsForBasis::sortdata =
 SewingSortRecordsByChiralOrder::metadata =
   "Cannot sort sewing records by chiral order because at least one record has missing or invalid AmpDim or SortData metadata.";
 SewingSymbolToAmpForm::badq =
+  "Unsupported Q replacement specification `1`. Use Automatic, a symbol, an integer label, or a signed integer list such as {1,-2}.";
+SewingReplaceQInSymbolForm::badq =
   "Unsupported Q replacement specification `1`. Use Automatic, a symbol, an integer label, or a signed integer list such as {1,-2}.";
 SewingSortData::usage =
   "SewingSortData[record] returns the explicit SortData association for a sewing record, falling back to record[\"LeftRecord\", \"SortData\"] when present.";
@@ -115,6 +122,8 @@ SewingCoeffMatrixDataUnion::usage =
   "SewingCoeffMatrixDataUnion[records, basis] returns an association containing the coefficient matrix, rank, reduced amplitudes, and monomial basis for a list of sewing records.";
 CompareGeneralSewingToCFBlocks::usage =
   "CompareGeneralSewingToCFBlocks[leftSpin, rightSpins, ampDim, rightPolarization, opts] compares the sewn records against matching `ConstructIndepCFBlock` results after massless reduction. It returns the sewn/CF records, common monomial basis, coefficient matrices, ranks, and the completeness verdict `CompleteQ`.";
+ConstructSewingRelativeChiralBasis::usage =
+  "ConstructSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, rightPolarization, opts] returns an association whose keys are relative chiral-order labels and whose values are independent symbolic sewing basis amplitudes. It first verifies CF/sewing span equivalence and a strict selected-count equality before returning. By default it replaces final Q factors using `QReplacement -> {1,-2}` while preserving `Xhard` and `Xsoft`; use `ReplaceQInFinalSymbolForm -> False` to keep Q visible. ConstructSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, rightPolarization, opts] specifies the right-side mass option explicitly.";
 
 SewingApplyLeftQReplacement::badq =
   "Unsupported QReplacement specification `1`. Use a symbol, an integer label, or a signed integer list such as {1,2} or {1,-2}.";
@@ -122,6 +131,12 @@ ConstructRightProjectedJResidualRecords::check =
   "Projected right residual construction failed the J-shape filter: `1`.";
 CompareGeneralSewingToCFBlocks::cf =
   "CF comparison failed for spin sector `1`, codeDim `2`, polarization `3`, mass `4`.";
+ConstructSewingRelativeChiralBasis::cfcheck =
+  "Sewing span is not complete against CF blocks. CF rank `1`, sewing rank `2`, joined rank `3`.";
+ConstructSewingRelativeChiralBasis::sort =
+  "Could not sort sewing records by relative chiral order because required metadata is missing.";
+ConstructSewingRelativeChiralBasis::count =
+  "Relative chiral basis count check failed: `1`.";
 
 SewingJFactorQ[head_][factor_] :=
   MatchQ[factor, _[_, _]] && Head[factor] === head && MemberQ[List @@ factor, J];
@@ -733,7 +748,7 @@ CompareRightAuxiliaryOnShellToDirectJ[target_Association, nCols_Integer?NonNegat
 Options[ConstructLeft3PointOpenBasis] = {
   MassiveSpin -> 1/2,
   PointCount -> Automatic,
-  QReplacement -> Automatic
+  QReplacement -> {1, -2}
 };
 
 (* Open question:
@@ -763,22 +778,67 @@ SewingClosedPairMonomials[n_Integer?NonNegative, np_: Automatic] := Module[
 SewingQLabelQ[x_] := MatchQ[x, _Symbol] && SymbolName[Unevaluated[x]] === "Q";
 SewingXSymbolQ[x_] := MatchQ[x, _Symbol] && MemberQ[{"Xhard", "Xsoft"}, SymbolName[Unevaluated[x]]];
 SewingContainsXSymbolQ[expr_] := ! FreeQ[expr, s_Symbol /; SewingXSymbolQ[s]];
-SewingDisplayForm[expr_] := expr /. {L1 -> 1, L2 -> 2};
+SewingDisplayForm[expr_, np_Integer?Positive] := Module[{sq1, sq2},
+  {sq1, sq2} = {2 np, 2 np - 1};
+  expr /. {L1 -> sq1, L2 -> sq2}
+];
 
 SewingQSingleFactor[0] := 0;
 SewingQSingleFactor[q_?Negative] := -SewingQSingleFactor[-q];
 SewingQSingleFactor[q_] := ab[q, J] sb[q, J];
 
+SewingQTerms[qSpec_] := Module[{qActual},
+  qActual = Replace[qSpec, Automatic -> {1, -2}];
+  Which[
+    ListQ[qActual], qActual,
+    IntegerQ[qActual] || MatchQ[qActual, _Symbol], {qActual},
+    True, $Failed
+  ]
+];
+
+SewingReplaceQInSymbolForm[expr_, qSpec_: {1, -2}] := Module[
+  {qTerms, qFactorQ, replaceQ, qPairAmp, convertTerm, converted},
+  qTerms = SewingQTerms[qSpec];
+  If[qTerms === $Failed,
+    Message[SewingReplaceQInSymbolForm::badq, qSpec];
+    Return[$Failed]
+  ];
+  qFactorQ[f_] := MatchQ[f, _ab | _sb] && AnyTrue[List @@ f, SewingQLabelQ];
+  replaceQ[f_ab, q_?Negative] := replaceQ[f, -q];
+  replaceQ[f_sb, q_?Negative] := replaceQ[f, -q];
+  replaceQ[ab[a_, b_], q_] := Which[
+    SewingQLabelQ[a], ab[q, b],
+    SewingQLabelQ[b], ab[a, q],
+    True, ab[a, b]
+  ];
+  replaceQ[sb[a_, b_], q_] := Which[
+    SewingQLabelQ[a], sb[q, b],
+    SewingQLabelQ[b], sb[a, q],
+    True, sb[a, b]
+  ];
+  qPairAmp[a_, s_] := Total[
+    (If[IntegerQ[#] && Negative[#], -1, 1] replaceQ[a, #] replaceQ[s, #]) & /@ qTerms
+  ];
+  convertTerm[term_] := Module[{factors, qAngles, qSquares, baseFactors},
+    factors = Prod2List[term];
+    qAngles = Select[factors, qFactorQ[#] && Head[#] === ab &];
+    qSquares = Select[factors, qFactorQ[#] && Head[#] === sb &];
+    If[Length[qAngles] =!= Length[qSquares], Return[$Failed]];
+    baseFactors = Select[factors, ! qFactorQ[#] &];
+    Expand[(Times @@ baseFactors) Times @@ MapThread[qPairAmp, {qAngles, qSquares}]]
+  ];
+  converted = convertTerm /@ Sum2List[Expand[expr]];
+  If[MemberQ[converted, $Failed], Return[$Failed]];
+  Expand[Total[converted]]
+];
+
 SewingSymbolToAmpForm[expr_, np_: Automatic, qSpec_: Automatic] := Module[
   {sq1, sq2, qActual, qTerms, qFactorQ, baseRules, replaceQ, qPairAmp, convertTerm, converted},
   {sq1, sq2} = If[IntegerQ[np], {2 np, 2 np - 1}, {8, 7}];
-  qActual = Replace[qSpec, Automatic -> {1, -2}];
-  qTerms = Which[
-    ListQ[qActual], qActual,
-    IntegerQ[qActual] || MatchQ[qActual, _Symbol], {qActual},
-    True,
-      Message[SewingSymbolToAmpForm::badq, qSpec];
-      Return[$Failed]
+  qTerms = SewingQTerms[qSpec];
+  If[qTerms === $Failed,
+    Message[SewingSymbolToAmpForm::badq, qSpec];
+    Return[$Failed]
   ];
   qFactorQ[f_] := MatchQ[f, _ab | _sb] && AnyTrue[List @@ f, SewingQLabelQ];
   baseRules = {
@@ -797,12 +857,12 @@ SewingSymbolToAmpForm[expr_, np_: Automatic, qSpec_: Automatic] := Module[
   replaceQ[f_sb, q_?Negative] := replaceQ[f, -q];
   replaceQ[ab[a_, b_], q_] := Which[
     SewingQLabelQ[a], ab[q, b],
-    SewingQLabelQ[b], ab[q, a],
+    SewingQLabelQ[b], ab[a, q],
     True, ab[a, b]
   ];
   replaceQ[sb[a_, b_], q_] := Which[
     SewingQLabelQ[a], sb[q, b],
-    SewingQLabelQ[b], sb[q, a],
+    SewingQLabelQ[b], sb[a, q],
     True, sb[a, b]
   ];
   qPairAmp[a_, s_] := Total[
@@ -1223,6 +1283,12 @@ SewingDefaultJMax[leftSpin_, ampDim_Integer, rightSpins_List] := Module[{nSlots 
   Max[0, Floor[ampDim/2]]
 ];
 
+SewingAutoJSearchLimit[leftSpin_, ampDim_Integer, rightSpins_List] := Module[
+  {base = SewingDefaultJMax[leftSpin, ampDim, rightSpins], spinPad},
+  spinPad = Max[0, Ceiling[2 Total[Abs[rightSpins]]]];
+  Max[base + spinPad + 3, ampDim + spinPad + 3]
+];
+
 SewingDefaultRightMass[np_Integer?Positive] := If[np >= 3, {3}, {}];
 
 SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List] := Module[
@@ -1261,7 +1327,8 @@ Options[ConstructGeneralSewingAmplitudeRecords] = Join[
     JMax -> Automatic,
     AuxiliarySpinRange -> Automatic,
     EqualAuxiliarySpin -> True,
-    QReplacement -> Automatic,
+    QReplacement -> {1, -2},
+    AutoJNoRightWindow -> 3,
     SewingContractionMode -> "Split",
     VerifyAmpDim -> True,
     Check3Point -> False,
@@ -1299,9 +1366,10 @@ ConstructGeneralSewingAmplitudeRecords[
   opts : OptionsPattern[]
 ] := Module[
   {
-    npFull, npRight, rightMassData, rightMass, jRangeOpt, jMaxOpt, jRange,
+    npFull, npRight, rightMassData, rightMass, jRangeOpt, jMaxOpt, jRange, autoJQ,
+    autoJLimit, noRightWindow, noRightCount,
     leftRecords, rightRecordsFor, rightRecords, rows, reducedOpts, key, qSpec, contractionMode,
-    leftChecks, failedChecks, cfPolarizations, debug
+    leftChecks, failedChecks, cfPolarizations, debug, buildLeftRecordsForJ, jLeftRecords, hasRightRecordsQ
   },
   debug = TrueQ[OptionValue[SewingDebug]];
   npFull = 2 + Length[rightSpins];
@@ -1314,10 +1382,11 @@ ConstructGeneralSewingAmplitudeRecords[
   rightMass = rightMassData["RightConstructMass"];
   jRangeOpt = OptionValue[JRange];
   jMaxOpt = OptionValue[JMax];
+  autoJQ = ! ListQ[jRangeOpt] && ! IntegerQ[jMaxOpt];
   jRange = Which[
     ListQ[jRangeOpt], jRangeOpt,
     IntegerQ[jMaxOpt], Range[0, jMaxOpt],
-    True, Range[0, SewingDefaultJMax[leftSpin, ampDim, rightSpins]]
+    True, {}
   ];
   qSpec = OptionValue[QReplacement];
   contractionMode = OptionValue[SewingContractionMode];
@@ -1337,25 +1406,6 @@ ConstructGeneralSewingAmplitudeRecords[
       {b, Range[0, 2 leftSpin]}
     ],
     1
-  ];
-  leftRecords = Flatten[
-    ConstructLeft3PointOpenBasis[
-      #,
-      MassiveSpin -> leftSpin,
-      PointCount -> npFull,
-      QReplacement -> qSpec
-    ] & /@ jRange
-  ];
-  If[MemberQ[leftRecords, $Failed], Return[$Failed]];
-  SewingLog[debug, "General.LeftRecords", <|"Count" -> Length[leftRecords]|>];
-  If[TrueQ[OptionValue[Check3Point]],
-    leftChecks = SewingLeftRecordCheck /@ leftRecords;
-    failedChecks = Select[leftChecks, SewingCheckFailureQ];
-    If[Length[failedChecks] > 0,
-      Message[ConstructGeneralSewingAmplitudeRecords::check, SewingCheckFailureMessage[First[failedChecks]]];
-      Return[$Failed]
-    ];
-    If[TrueQ[OptionValue[CheckVerbose]], Print["Sewing 3pt checks passed: ", Length[leftChecks]]]
   ];
   rightRecordsFor[left_Association] := rightRecordsFor[
     left["J"],
@@ -1386,6 +1436,49 @@ ConstructGeneralSewingAmplitudeRecords[
         rr
       ]
     ]
+  ];
+  buildLeftRecordsForJ[j_Integer?NonNegative] := ConstructLeft3PointOpenBasis[
+      j,
+      MassiveSpin -> leftSpin,
+      PointCount -> npFull,
+      QReplacement -> qSpec
+  ];
+  hasRightRecordsQ[records_List] := AnyTrue[records, Length[rightRecordsFor[#]] > 0 &];
+  If[TrueQ[autoJQ],
+    autoJLimit = SewingAutoJSearchLimit[leftSpin, ampDim, rightSpins];
+    noRightWindow = OptionValue[AutoJNoRightWindow];
+    If[! IntegerQ[noRightWindow] || noRightWindow < 1, noRightWindow = 3];
+    noRightCount = 0;
+    leftRecords = Reap[
+      Do[
+        jLeftRecords = buildLeftRecordsForJ[j];
+        If[MemberQ[jLeftRecords, $Failed], Sow[$Failed]; Break[]];
+        If[hasRightRecordsQ[jLeftRecords],
+          noRightCount = 0;
+          Scan[Sow, jLeftRecords],
+          noRightCount++;
+          If[noRightCount >= noRightWindow,
+            SewingLog[debug, "General.AutoJStop", <|"LastJ" -> j, "NoRightWindow" -> noRightWindow|>];
+            Break[]
+          ]
+        ],
+        {j, 0, autoJLimit}
+      ]
+    ][[2]];
+    leftRecords = If[leftRecords === {}, {}, First[leftRecords]];
+    jRange = DeleteDuplicates[Lookup[Cases[leftRecords, _Association], "J", {}]],
+    leftRecords = Flatten[buildLeftRecordsForJ /@ jRange]
+  ];
+  If[MemberQ[leftRecords, $Failed], Return[$Failed]];
+  SewingLog[debug, "General.LeftRecords", <|"Count" -> Length[leftRecords]|>];
+  If[TrueQ[OptionValue[Check3Point]],
+    leftChecks = SewingLeftRecordCheck /@ leftRecords;
+    failedChecks = Select[leftChecks, SewingCheckFailureQ];
+    If[Length[failedChecks] > 0,
+      Message[ConstructGeneralSewingAmplitudeRecords::check, SewingCheckFailureMessage[First[failedChecks]]];
+      Return[$Failed]
+    ];
+    If[TrueQ[OptionValue[CheckVerbose]], Print["Sewing 3pt checks passed: ", Length[leftChecks]]]
   ];
   reducedOpts = Sequence @@ Join[
     FilterRules[{opts}, Options[SewingReducedMasslessGeneral]],
@@ -1466,11 +1559,16 @@ ConstructGeneralSewingAmplitudeRecords[
               "AmpL" -> left["AmpL"],
               "AmpR" -> right["AmpR"],
               "SewingSymForm" -> symTotal,
-              "SewingDisplayForm" -> SewingDisplayForm[symTotal],
+              "SewingDisplayForm" -> SewingDisplayForm[symTotal, npFull],
               "SewingAmpFormRaw" -> totalRaw,
               "SewingAmpFormTerms" -> totalTerms,
               "SewingAmpForm" -> total,
-              "FormMap" -> <|"SymbolForm" -> symTotal, "DisplayForm" -> SewingDisplayForm[symTotal], "AmpFormRaw" -> totalRaw, "AmpForm" -> total|>,
+              "FormMap" -> <|
+                "SymbolForm" -> symTotal,
+                "DisplayForm" -> SewingDisplayForm[symTotal, npFull],
+                "AmpFormRaw" -> totalRaw,
+                "WorkingAmpForm" -> total
+              |>,
               "TotalAmp" -> total,
               "ReducedAmp" -> SewingReducedMasslessGeneral[total, reducedOpts],
               "LeftRecord" -> left,
@@ -1727,6 +1825,7 @@ Options[ConstructIndepSewingBlock] = Join[
   {
     CheckAgainstCF -> False,
     FilterSewingByCFPolarization -> False,
+    ReturnRecords -> False,
     SewingOutputForm -> "SymbolForm",
     SewingDebug -> False
   },
@@ -1756,7 +1855,7 @@ ConstructIndepSewingBlock[
 ] := Module[
   {
     records, comparison, np, leftMass, rightMassData, fullMass, leftPolarRange,
-    cfPolarizations, block, blockRank, cfRank, debug
+    cfPolarizations, block, blockMatrix, blockRows, blockRank, cfRank, debug
   },
   debug = TrueQ[OptionValue[SewingDebug]];
   If[TrueQ[OptionValue[CheckAgainstCF]],
@@ -1785,15 +1884,17 @@ ConstructIndepSewingBlock[
       Sequence @@ FilterRules[{opts}, Options[SewingIndependentBlockFromRecords]]
     ];
     cfRank = comparison["CFMatrix"]["Rank"];
-    blockRank = If[ListQ[block] && Length[block] == 3, MatrixRank[block[[2]]], -1];
-    SewingLog[debug, "Independent.Block", <|"BlockRows" -> If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], 0], "BlockRank" -> blockRank, "CFRank" -> cfRank|>];
+    blockMatrix = If[AssociationQ[block], Lookup[block, "Matrix", {}], If[ListQ[block] && Length[block] == 3, block[[2]], {}]];
+    blockRows = If[AssociationQ[block], Length[Lookup[block, "Records", {}]], If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], 0]];
+    blockRank = If[blockMatrix === {}, 0, MatrixRank[blockMatrix]];
+    SewingLog[debug, "Independent.Block", <|"BlockRows" -> blockRows, "BlockRank" -> blockRank, "CFRank" -> cfRank|>];
     If[
-      ! (ListQ[block] && Length[block] == 3 && blockRank == Length[block[[1]]] && blockRank == cfRank),
+      ! (blockRows > 0 && blockRank == blockRows && blockRank == cfRank),
       Message[
         ConstructIndepSewingBlock::indcheck,
         ToString[
           <|
-            "BlockRows" -> If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], Missing["Unavailable"]],
+            "BlockRows" -> blockRows,
             "BlockRank" -> blockRank,
             "CFRank" -> cfRank,
             "SewingRank" -> comparison["SewingMatrix"]["Rank"],
@@ -1835,4 +1936,114 @@ ConstructIndepSewingBlock[
   ];
   SewingLog[debug, "Independent.Done", <|"InputRecords" -> Length[records], "BlockRows" -> If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], 0]|>];
   block
+];
+
+Options[ConstructSewingRelativeChiralBasis] = Join[
+  {ReplaceQInFinalSymbolForm -> True},
+  Options[ConstructIndepSewingBlock]
+];
+ConstructSewingRelativeChiralBasis[
+  leftSpin_,
+  rightSpins_List,
+  rightMass_,
+  ampDim_Integer,
+  rightPolarization_List,
+  opts : OptionsPattern[]
+] := ConstructSewingRelativeChiralBasis[
+  leftSpin,
+  rightSpins,
+  ampDim,
+  rightPolarization,
+  Sequence @@ Join[{RightMass -> rightMass}, {opts}]
+];
+
+ConstructSewingRelativeChiralBasis[
+  leftSpin_,
+  rightSpins_List,
+  ampDim_Integer,
+  rightPolarization_List,
+  opts : OptionsPattern[]
+] := Module[
+  {
+    comparison, records, sorted, block, selected, ampsByOrder, outputAmp, cfRank, sewingRank, joinedRank,
+    selectedCount, selectedRank, outputCount, debug
+  },
+  debug = TrueQ[OptionValue[SewingDebug]];
+  comparison = CompareGeneralSewingToCFBlocks[
+    leftSpin,
+    rightSpins,
+    ampDim,
+    rightPolarization,
+    Sequence @@ FilterRules[{opts}, Options[CompareGeneralSewingToCFBlocks]]
+  ];
+  If[! AssociationQ[comparison] || ! TrueQ[Lookup[comparison, "CompleteQ", False]],
+    Message[
+      ConstructSewingRelativeChiralBasis::cfcheck,
+      Lookup[Lookup[comparison, "CFMatrix", <|"Rank" -> Missing["Unavailable"]|>], "Rank", Missing["Unavailable"]],
+      Lookup[Lookup[comparison, "SewingMatrix", <|"Rank" -> Missing["Unavailable"]|>], "Rank", Missing["Unavailable"]],
+      Lookup[Lookup[comparison, "JoinedMatrix", <|"Rank" -> Missing["Unavailable"]|>], "Rank", Missing["Unavailable"]]
+    ];
+    Return[$Failed]
+  ];
+  records = Lookup[comparison, "SewingRecords", $Failed];
+  If[! ListQ[records], Return[$Failed]];
+  sorted = SewingSortRecordsByChiralOrder[records];
+  If[sorted === $Failed,
+    Message[ConstructSewingRelativeChiralBasis::sort];
+    Return[$Failed]
+  ];
+  block = SewingIndependentBlockFromRecords[
+    sorted,
+    comparison["Monomials"],
+    ReturnRecords -> True,
+    SewingOutputForm -> "SymbolForm"
+  ];
+  If[! AssociationQ[block], Return[$Failed]];
+  selected = block["Records"];
+  outputAmp[rec_Association] := Module[{amp = SewingRecordSymbolForm[rec], replaced},
+    If[! TrueQ[OptionValue[ReplaceQInFinalSymbolForm]], Return[amp]];
+    replaced = SewingReplaceQInSymbolForm[amp, OptionValue[QReplacement]];
+    If[replaced === $Failed, amp, replaced]
+  ];
+  ampsByOrder = Association @ KeyValueMap[
+    #1 -> (outputAmp /@ #2) &,
+    GroupBy[selected, SewingRelativeChiralOrder]
+  ];
+  cfRank = comparison["CFMatrix"]["Rank"];
+  sewingRank = comparison["SewingMatrix"]["Rank"];
+  joinedRank = comparison["JoinedMatrix"]["Rank"];
+  selectedCount = Length[selected];
+  selectedRank = If[Lookup[block, "Matrix", {}] === {}, 0, MatrixRank[block["Matrix"]]];
+  outputCount = Total[Length /@ Values[ampsByOrder]];
+  SewingLog[
+    debug,
+    "RelativeChiralBasis.Counts",
+    <|
+      "CFRank" -> cfRank,
+      "SewingRank" -> sewingRank,
+      "JoinedRank" -> joinedRank,
+      "SelectedCount" -> selectedCount,
+      "SelectedRank" -> selectedRank,
+      "OutputCount" -> outputCount
+    |>
+  ];
+  If[
+    ! (cfRank == sewingRank == joinedRank == selectedCount == selectedRank == outputCount),
+    Message[
+      ConstructSewingRelativeChiralBasis::count,
+      ToString[
+        <|
+          "CFRank" -> cfRank,
+          "SewingRank" -> sewingRank,
+          "JoinedRank" -> joinedRank,
+          "SelectedCount" -> selectedCount,
+          "SelectedRank" -> selectedRank,
+          "OutputCount" -> outputCount
+        |>,
+        InputForm
+      ]
+    ];
+    Return[$Failed]
+  ];
+  KeySort[ampsByOrder]
 ];

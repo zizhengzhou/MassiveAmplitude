@@ -6,7 +6,10 @@ requiredSymbols = {
   ConstructGeneralSewingAmplitudeRecords,
   ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
+  ConstructSewingRelativeChiralBasis,
   SewingSymbolToAmpForm,
+  SewingReplaceQInSymbolForm,
+  SewingDisplayForm,
   SewingRecordSymbolForm,
   SewingRecordAmpForm,
   SewingContractionTerms,
@@ -56,6 +59,11 @@ If[$SewingDebug =!= False,
   Exit[1]
 ];
 
+If[! MatchQ[Unevaluated[SewingDisplayForm[sb[L1, 4]]], _SewingDisplayForm],
+  Print["SewingDisplayForm without an explicit point count should remain unevaluated."];
+  Exit[1]
+];
+
 If[
   Expand[
     SewingSymbolToAmpForm[Xhard ab[Q, 4] sb[Q, 4], 4] -
@@ -67,10 +75,52 @@ If[
 
 If[
   Expand[
+    SewingSymbolToAmpForm[Xhard ab[3, Q] sb[6, Q], 4] -
+      (sb[8, 7] - ab[1, 2]) (ab[3, 1] sb[6, 1] - ab[3, 2] sb[6, 2])
+  ] =!= 0,
+  Print["SewingSymbolToAmpForm should replace Q as a momentum label without moving bracket slots."];
+  Exit[1]
+];
+
+If[
+  Expand[
+    SewingReplaceQInSymbolForm[Xhard ab[3, Q] sb[6, Q]] -
+      Xhard (ab[3, 1] sb[6, 1] - ab[3, 2] sb[6, 2])
+  ] =!= 0,
+  Print["SewingReplaceQInSymbolForm should replace Q by p1-p2 while preserving Xhard/Xsoft."];
+  Exit[1]
+];
+
+If[
+  Expand[
     SewingSymbolToAmpForm[Xsoft ab[Q, 4] sb[Q, 4], 4, qSym] -
       (sb[8, 7] + ab[1, 2]) ab[qSym, 4] sb[qSym, 4]
   ] =!= 0,
   Print["SewingSymbolToAmpForm should keep symbolic QReplacement labels symbolic."];
+  Exit[1]
+];
+
+leftSymbolProbe = Select[
+  ConstructLeft3PointOpenBasis[2, PointCount -> 4],
+  ! FreeQ[#["AmpLSymbolForm"], s_Symbol /; SymbolName[Unevaluated[s]] === "Q"] &
+];
+If[
+  leftSymbolProbe === {} ||
+    ! AllTrue[
+      leftSymbolProbe,
+      FreeQ[
+        #["AmpLSymbolForm"],
+        _sb?(AnyTrue[List @@ #, MatchQ[#, 1 | 2] &] &)
+      ] &
+    ] ||
+    ! AllTrue[
+      leftSymbolProbe,
+      FreeQ[
+        #["AmpLSymbolForm"],
+        _ab?(AnyTrue[List @@ #, MatchQ[#, s_Symbol /; MemberQ[{"L1", "L2"}, SymbolName[Unevaluated[s]]]] &] &)
+      ] &
+    ],
+  Print["ConstructLeft3PointOpenBasis should keep massive square labels only on square brackets."];
   Exit[1]
 ];
 
