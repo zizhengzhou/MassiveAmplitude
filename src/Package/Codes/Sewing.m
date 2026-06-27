@@ -7,7 +7,9 @@ ClearAll[
   SewingClosedPairMonomials, SewingOpenPairMonomials,
   SewingBalancedOpenPairQ,
   ConstructLeft3PointOpenBasis,
-  SewingQSingleFactor, SewingApplyLeftQReplacement,
+  SewingQLabelQ, SewingXSymbolQ, SewingContainsXSymbolQ, SewingDisplayForm,
+  SewingQSingleFactor, SewingApplyLeftQReplacement, SewingSymbolToAmpForm,
+  SewingRecordSymbolForm, SewingRecordAmpForm,
   SewingRightResidualRecordsDirect, SewingRightResidualRecordsAuxiliary,
   CompareRightResidualBackends, SewingAuxiliaryAmpToFormalJ, SewingAuxiliaryAmpToFormalJCandidates,
   ConstructRightAuxiliaryOnShellRecords, CompareRightAuxiliaryOnShellToDirectJ,
@@ -21,7 +23,8 @@ ClearAll[
   SewingRightJCountsMatchQ, SewingBracketDegree, SewingAmpDimMatchQ,
   SewingLeftDegreeData, SewingCodeDimFromAmpDim, SewingDefaultJMax, SewingDefaultRightMass,
   SewingMassOptionData, SewingCoeffMatrixDataUnion, SewingValidMetaQ,
-  SewingAmpMetaTerms, SewingRecordPolarizationMatchQ, SewingIndependentBlockFromRecords,
+  SewingAmpMetaTerms, SewingPhysicalAmpTermQ, SewingRecordPolarizationMatchQ, SewingIndependentBlockFromRecords,
+  SewingProjectReducedAmpToBasis,
   SewingMasslessSelfColumnFreeQ, SewingLeftRecordCheck, SewingRightRecordCheck, SewingSewnRecordCheck,
   SewingCheckFailureQ, SewingCheckFailureMessage,
   SewingProjectAuxiliaryLabels, SewingNormalizeJTarget,
@@ -31,7 +34,13 @@ ClearAll[
 ];
 
 ConstructLeft3PointOpenBasis::usage =
-  "ConstructLeft3PointOpenBasis[J, opts] returns association records for equal-spin massive-massive-current three-point structures with open J slots. The result records include the physical left amplitude `AmpL`, the symbolic closed-basis version `ClosedBasisAmpL`, and explicit sorting metadata `SortData = <|\"J\", \"Xhard\", \"Xsoft\"|>`. Options include `MassiveSpin`, `PointCount`, and `QReplacement`.";
+  "ConstructLeft3PointOpenBasis[J, opts] returns association records for equal-spin massive-massive-current three-point structures with open J slots. The result records include symbolic left form `AmpLSymbolForm`, internal spinor form `AmpLAmpForm`, compatibility key `AmpL`, and explicit sorting metadata `SortData = <|\"J\", \"Xhard\", \"Xsoft\"|>`. Options include `MassiveSpin`, `PointCount`, and `QReplacement`.";
+SewingSymbolToAmpForm::usage =
+  "SewingSymbolToAmpForm[expr, np, qSpec] converts display-level `Xhard`, `Xsoft`, and `Q` factors into the spinor-helicity amp form used internally. The default qSpec is {1, -2}, i.e. Q = p1 - p2.";
+SewingRecordSymbolForm::usage =
+  "SewingRecordSymbolForm[record] returns the preferred display form of a sewing record, using `SewingSymForm` when present and falling back to legacy amplitude keys.";
+SewingRecordAmpForm::usage =
+  "SewingRecordAmpForm[record] returns the internal spinor-helicity amp form of a sewing record, using `SewingAmpForm` when present and falling back to legacy amplitude keys.";
 SewingRightResidualRecordsDirect::usage =
   "SewingRightResidualRecordsDirect[target, nCols] enumerates right-side residual SSYT records from explicit angular/square target counts.";
 SewingRightResidualRecordsAuxiliary::usage =
@@ -61,7 +70,7 @@ SewingContractionTerms::usage =
 SymmetricSewContract::usage =
   "SymmetricSewContract[ampL, ampR] contracts all J slots by summing over all fully symmetric contraction terms. Use SewingContractionTerms to keep the terms split.";
 ConstructGeneralSewingAmplitudeRecords::usage =
-  "ConstructGeneralSewingAmplitudeRecords[leftSpin, rightSpins, ampDim, rightPolarization, opts] constructs sewn amplitude records for an equal-spin left current and a physical right residual sector. Each record carries `AmpL`, `AmpR`, `TotalAmp`, `ReducedAmp`, left/right provenance, `SortData`, and `QReplacement`. `QReplacement` may be a symbol (kept symbolic), an integer label, or a signed list such as `{1,2}` or `{1,-2}` interpreted termwise in `(<QJ>[QJ])^n`.";
+  "ConstructGeneralSewingAmplitudeRecords[leftSpin, rightSpins, ampDim, rightPolarization, opts] constructs sewn amplitude records for an equal-spin left current and a physical right residual sector. Each record carries display-level `SewingSymForm`, internal `SewingAmpForm`, reduced `ReducedAmp`, left/right provenance, `SortData`, and `QReplacement`. Compatibility keys `AmpL` and `TotalAmp` keep the internal amp form.";
 ConstructGeneralSewingAmplitudeRecords::ampdim =
   "Internal sewing dimension mismatch for J=`1`, left degree data `2`, right ampDim `3`. The sewn amplitude has bracket degrees `4`, but expected ampDim `5`.";
 ConstructGeneralSewingAmplitudeRecords::args =
@@ -82,6 +91,8 @@ SewingSortRecordsForBasis::sortdata =
   "Cannot sort sewing records because at least one record has missing or invalid SortData metadata.";
 SewingSortRecordsByChiralOrder::metadata =
   "Cannot sort sewing records by chiral order because at least one record has missing or invalid AmpDim or SortData metadata.";
+SewingSymbolToAmpForm::badq =
+  "Unsupported Q replacement specification `1`. Use Automatic, a symbol, an integer label, or a signed integer list such as {1,-2}.";
 SewingSortData::usage =
   "SewingSortData[record] returns the explicit SortData association for a sewing record, falling back to record[\"LeftRecord\", \"SortData\"] when present.";
 SewingSortDataQ::usage =
@@ -99,7 +110,7 @@ SewingBasisSortKey::usage =
 SewingSortRecordsForBasis::usage =
   "SewingSortRecordsForBasis[records] sorts sewing records using explicit SortData metadata and fails if any record has missing or invalid SortData.";
 SewingIndependentBlockFromRecords::usage =
-  "SewingIndependentBlockFromRecords[records, basis] reduces sorted sewn records to a rank-maximal independent block and returns {basisAmplitudes, coefficientMatrix, reducedMonomialBasis}. With ReturnRecords -> True it returns an association containing the selected records, positions, matrix, and monomial basis. If basis is Automatic, it is built from reduced monomials.";
+  "SewingIndependentBlockFromRecords[records, basis] reduces sorted sewn records to a rank-maximal independent block and returns {basisAmplitudes, coefficientMatrix, reducedMonomialBasis}. The basis amplitudes use `SewingOutputForm`, defaulting to `SymbolForm`. With ReturnRecords -> True it returns an association containing the selected records, positions, matrix, and monomial basis. If basis is Automatic, it is built from reduced monomials.";
 SewingCoeffMatrixDataUnion::usage =
   "SewingCoeffMatrixDataUnion[records, basis] returns an association containing the coefficient matrix, rank, reduced amplitudes, and monomial basis for a list of sewing records.";
 CompareGeneralSewingToCFBlocks::usage =
@@ -749,6 +760,81 @@ SewingClosedPairMonomials[n_Integer?NonNegative, np_: Automatic] := Module[
   ]
 ];
 
+SewingQLabelQ[x_] := MatchQ[x, _Symbol] && SymbolName[Unevaluated[x]] === "Q";
+SewingXSymbolQ[x_] := MatchQ[x, _Symbol] && MemberQ[{"Xhard", "Xsoft"}, SymbolName[Unevaluated[x]]];
+SewingContainsXSymbolQ[expr_] := ! FreeQ[expr, s_Symbol /; SewingXSymbolQ[s]];
+SewingDisplayForm[expr_] := expr /. {L1 -> 1, L2 -> 2};
+
+SewingQSingleFactor[0] := 0;
+SewingQSingleFactor[q_?Negative] := -SewingQSingleFactor[-q];
+SewingQSingleFactor[q_] := ab[q, J] sb[q, J];
+
+SewingSymbolToAmpForm[expr_, np_: Automatic, qSpec_: Automatic] := Module[
+  {sq1, sq2, qActual, qTerms, qFactorQ, baseRules, replaceQ, qPairAmp, convertTerm, converted},
+  {sq1, sq2} = If[IntegerQ[np], {2 np, 2 np - 1}, {8, 7}];
+  qActual = Replace[qSpec, Automatic -> {1, -2}];
+  qTerms = Which[
+    ListQ[qActual], qActual,
+    IntegerQ[qActual] || MatchQ[qActual, _Symbol], {qActual},
+    True,
+      Message[SewingSymbolToAmpForm::badq, qSpec];
+      Return[$Failed]
+  ];
+  qFactorQ[f_] := MatchQ[f, _ab | _sb] && AnyTrue[List @@ f, SewingQLabelQ];
+  baseRules = {
+    s_Symbol /; SymbolName[Unevaluated[s]] === "Xhard" :> (sb[sq1, sq2] - ab[1, 2]),
+    s_Symbol /; SymbolName[Unevaluated[s]] === "Xsoft" :> (sb[sq1, sq2] + ab[1, 2]),
+    L1 -> sq1,
+    L2 -> sq2,
+    sb[1, x_] /; x =!= 2 :> sb[sq1, x],
+    sb[x_, 1] /; x =!= 2 :> sb[x, sq1],
+    sb[2, x_] /; x =!= 1 :> sb[sq2, x],
+    sb[x_, 2] /; x =!= 1 :> sb[x, sq2],
+    Xhard -> (sb[sq1, sq2] - ab[1, 2]),
+    Xsoft -> (sb[sq1, sq2] + ab[1, 2])
+  };
+  replaceQ[f_ab, q_?Negative] := replaceQ[f, -q];
+  replaceQ[f_sb, q_?Negative] := replaceQ[f, -q];
+  replaceQ[ab[a_, b_], q_] := Which[
+    SewingQLabelQ[a], ab[q, b],
+    SewingQLabelQ[b], ab[q, a],
+    True, ab[a, b]
+  ];
+  replaceQ[sb[a_, b_], q_] := Which[
+    SewingQLabelQ[a], sb[q, b],
+    SewingQLabelQ[b], sb[q, a],
+    True, sb[a, b]
+  ];
+  qPairAmp[a_, s_] := Total[
+    (If[IntegerQ[#] && Negative[#], -1, 1] replaceQ[a, #] replaceQ[s, #]) & /@ qTerms
+  ];
+  convertTerm[term_] := Module[{factors, qAngles, qSquares, baseFactors},
+    factors = Prod2List[term];
+    qAngles = Select[factors, qFactorQ[#] && Head[#] === ab &];
+    qSquares = Select[factors, qFactorQ[#] && Head[#] === sb &];
+    If[Length[qAngles] =!= Length[qSquares], Return[$Failed]];
+    baseFactors = Select[factors, ! qFactorQ[#] &] /. baseRules;
+    Expand[(Times @@ baseFactors) Times @@ MapThread[qPairAmp, {qAngles, qSquares}]]
+  ];
+  converted = convertTerm /@ Sum2List[Expand[expr]];
+  If[MemberQ[converted, $Failed], Return[$Failed]];
+  Expand[Total[converted]]
+];
+
+SewingRecordSymbolForm[rec_Association] := Lookup[
+  rec,
+  "SewingDisplayForm",
+  Lookup[rec, "SewingSymForm",
+  Lookup[rec, "TotalAmp", Lookup[rec, "AmpL", Missing["NoSymbolForm"]]]
+  ]
+];
+
+SewingRecordAmpForm[rec_Association] := Lookup[
+  rec,
+  "SewingAmpForm",
+  Lookup[rec, "TotalAmp", Lookup[rec, "AmpLAmpForm", Lookup[rec, "AmpL", Missing["NoAmpForm"]]]]
+];
+
 SewingOpenPairMonomials[m_Integer?NonNegative, np_: Automatic] := Module[
   {sq1, sq2},
   {sq1, sq2} = If[IntegerQ[np], {2 np, 2 np - 1}, {8, 7}];
@@ -756,7 +842,7 @@ SewingOpenPairMonomials[m_Integer?NonNegative, np_: Automatic] := Module[
   <|
     "OpenPowers" -> <|"Angle1" -> a, "Square1" -> m - a, "Angle2" -> b, "Square2" -> m - b|>,
     "Amp" -> ab[1, J]^a sb[sq1, J]^(m - a) ab[2, J]^b sb[sq2, J]^(m - b),
-    "SymbolicAmp" -> ab[1, J]^a sb[1, J]^(m - a) ab[2, J]^b sb[2, J]^(m - b)
+    "SymbolicAmp" -> ab[1, J]^a sb[L1, J]^(m - a) ab[2, J]^b sb[L2, J]^(m - b)
   |>,
   {a, 0, m}, {b, 0, m}
   ]
@@ -783,9 +869,11 @@ ConstructLeft3PointOpenBasis[spinJ_Integer?NonNegative, OptionsPattern[]] := Mod
   open = SewingOpenPairMonomials[openSlots, pointCount];
   If[qExponent == 0, open = Select[open, SewingBalancedOpenPairQ]];
   records = Flatten@Table[
+    With[{sym = Expand[o["SymbolicAmp"] c["SymbolicAmp"] qPower]},
     <|
       "J" -> spinJ,
       "MassiveSpin" -> spin,
+      "PointCount" -> pointCount,
       "OpenSlots" -> openSlots,
       "ClosedSlots" -> closedSlots,
       "LeftStructure" -> StringJoin["S", ToString[nSlots], "J", ToString[spinJ], "O", ToString[oi], "C", ToString[ci]],
@@ -796,10 +884,13 @@ ConstructLeft3PointOpenBasis[spinJ_Integer?NonNegative, OptionsPattern[]] := Mod
         "Xhard" -> c["ClosedPowers"]["Xhard"],
         "Xsoft" -> c["ClosedPowers"]["Xsoft"]
       |>,
-      "QComponent" -> {},
-      "AmpL" -> Expand[o["Amp"] c["Amp"] qPower],
-      "ClosedBasisAmpL" -> Expand[o["SymbolicAmp"] c["SymbolicAmp"] qPower]
-    |>,
+      "QComponent" -> If[qExponent == 0, {}, {"Q"}],
+      "QReplacement" -> qSpec,
+      "AmpLSymbolForm" -> sym,
+      "AmpLAmpForm" -> SewingSymbolToAmpForm[sym, pointCount, qSpec],
+      "AmpL" -> SewingSymbolToAmpForm[sym, pointCount, qSpec],
+      "ClosedBasisAmpL" -> sym
+    |>],
     {oi, Length[open]}, {ci, Length[closed]},
     {o, {open[[oi]]}}, {c, {closed[[ci]]}}
   ];
@@ -810,37 +901,35 @@ ConstructLeft3PointOpenBasis[spinJ_Integer?NonNegative, OptionsPattern[]] := Mod
   records
 ];
 
-SewingQSingleFactor[0] := 0;
-SewingQSingleFactor[q_?Negative] := -SewingQSingleFactor[-q];
-SewingQSingleFactor[q_] := ab[q, J] sb[q, J];
-
 SewingApplyLeftQReplacement[leftRecord_Association, qSpec_] := Module[
-  {amp, qBracketQ, qAmp, qLabel, replaceTerm, replacedTerms, qCounts},
-  amp = leftRecord["AmpL"];
+  {amp, qBracketQ, qLabel, qActual, qCounts, ampForm},
+  amp = Lookup[leftRecord, "AmpLSymbolForm", leftRecord["AmpL"]];
   qBracketQ[f_] := MatchQ[f, _ab | _sb] && MemberQ[List @@ f, Q] && MemberQ[List @@ f, J];
-  qAmp = If[ListQ[qSpec], Total[SewingQSingleFactor /@ qSpec], SewingQSingleFactor[qSpec]];
-  qLabel = If[ListQ[qSpec],
-    StringJoin["Qsum", StringRiffle[ToString /@ qSpec, ""]],
+  qActual = Replace[qSpec, Automatic -> {1, -2}];
+  qLabel = If[ListQ[qActual],
+    StringJoin["Qsum", StringRiffle[ToString /@ qActual, ""]],
     StringJoin["Q", ToString[qSpec]]
   ];
-  replaceTerm[term_] := Module[{factors, qAngleCount, qSquareCount, baseFactors},
-    factors = Prod2List[term];
-    qAngleCount = Count[factors, f_ /; qBracketQ[f] && Head[f] === ab];
-    qSquareCount = Count[factors, f_ /; qBracketQ[f] && Head[f] === sb];
-    If[qAngleCount =!= qSquareCount, Return[$Failed]];
-    baseFactors = Select[factors, ! qBracketQ[#] &];
-    {qAngleCount, (Times @@ baseFactors) qAmp^qAngleCount}
+  qCounts = DeleteDuplicates[
+    Count[Prod2List[#], f_ /; qBracketQ[f] && Head[f] === ab] & /@ Sum2List[Expand[amp]]
   ];
-  replacedTerms = replaceTerm /@ Sum2List[Expand[amp]];
-  If[MemberQ[replacedTerms, $Failed], Return[$Failed]];
-  qCounts = DeleteDuplicates[replacedTerms[[All, 1]]];
+  If[
+    qCounts =!= DeleteDuplicates[
+      Count[Prod2List[#], f_ /; qBracketQ[f] && Head[f] === sb] & /@ Sum2List[Expand[amp]]
+    ],
+    Return[$Failed]
+  ];
+  ampForm = SewingSymbolToAmpForm[amp, Lookup[leftRecord, "PointCount", Automatic], qSpec];
+  If[ampForm === $Failed, Return[$Failed]];
   Append[
     leftRecord,
     {
       "OpenAmpL" -> amp,
       "QComponent" -> If[Max[qCounts] == 0, {}, {qLabel}],
       "QReplacement" -> qSpec,
-      "AmpL" -> Expand[Total[replacedTerms[[All, 2]]]]
+      "AmpLSymbolForm" -> amp,
+      "AmpLAmpForm" -> ampForm,
+      "AmpL" -> ampForm
     }
   ]
 ];
@@ -1090,19 +1179,27 @@ SewingRightRecordCheck[left_Association, right_Association, rightAmpDim_Integer]
 ];
 
 SewingSewnRecordCheck[record_Association, fullMass_List, cfPolarizations_List] := Module[
-  {issues = {}, np, metas, reduced, expectedSpins},
+  {issues = {}, np, metas, physicalTerms, reduced, expectedSpins},
   np = record["PointCount"];
   metas = SewingAmpMetaTerms[record["TotalAmp"], np, fullMass];
   reduced = record["ReducedAmp"];
   expectedSpins = Join[{record["LeftSpin"], record["LeftSpin"]}, record["RightSpins"]];
+  physicalTerms = If[
+    SewingContainsXSymbolQ[Lookup[record, "SewingSymForm", 0]],
+    Sum2List[Expand[record["TotalAmp"]]],
+    Select[
+      Sum2List[Expand[record["TotalAmp"]]],
+      SewingPhysicalAmpTermQ[#, np, fullMass, expectedSpins, cfPolarizations] &
+    ]
+  ];
   If[Length[metas] == 0 || ! AllTrue[metas, SewingValidMetaQ[#, np] &],
     AppendTo[issues, <|"Check" -> "Sewing.Amp2MetaInfo.Valid", "MetaTerms" -> metas|>]
   ];
-  If[Length[metas] > 0 && ! AllTrue[metas, #[[1]] === expectedSpins &],
-    AppendTo[issues, <|"Check" -> "Sewing.Amp2MetaInfo.Spins", "MetaTerms" -> metas, "ExpectedSpins" -> expectedSpins|>]
-  ];
-  If[Length[metas] > 0 && ! AllTrue[metas, MemberQ[cfPolarizations, #[[2]]] &],
-    AppendTo[issues, <|"Check" -> "Sewing.Amp2MetaInfo.Polarization", "MetaTerms" -> metas, "AllowedPolarizations" -> cfPolarizations|>]
+  If[Length[physicalTerms] == 0,
+    AppendTo[
+      issues,
+      <|"Check" -> "Sewing.Amp2MetaInfo.PhysicalSector", "MetaTerms" -> metas, "ExpectedSpins" -> expectedSpins, "AllowedPolarizations" -> cfPolarizations|>
+    ]
   ];
   If[TrueQ[Expand[reduced] === 0],
     AppendTo[issues, <|"Check" -> "Sewing.ReducedNonZero", "Message" -> "ReducedAmp vanished after massless limit and ReduceSt."|>]
@@ -1164,7 +1261,7 @@ Options[ConstructGeneralSewingAmplitudeRecords] = Join[
     JMax -> Automatic,
     AuxiliarySpinRange -> Automatic,
     EqualAuxiliarySpin -> True,
-    QReplacement -> 2,
+    QReplacement -> Automatic,
     SewingContractionMode -> "Split",
     VerifyAmpDim -> True,
     Check3Point -> False,
@@ -1298,15 +1395,33 @@ ConstructGeneralSewingAmplitudeRecords[
     rightRecords = rightRecordsFor[left];
     Table[
       If[! SewingRightJCountsMatchQ[left["AmpL"], right["AmpR"]], Nothing,
-        Module[{totals, total, rec, check},
-          totals = Switch[
+        Module[{symTotals, ampTotals, symTotal, totalRaw, totalTerms, total, rec, check},
+          symTotals = Switch[
             contractionMode,
-            "Sum", {SymmetricSewContract[left["AmpL"], right["AmpR"]]},
-            "Split", SewingContractionTerms[left["AmpL"], right["AmpR"]]
+            "Sum", {SymmetricSewContract[left["AmpLSymbolForm"], right["AmpR"]]},
+            "Split", SewingContractionTerms[left["AmpLSymbolForm"], right["AmpR"]]
           ];
-          If[Length[totals] == 0, Nothing,
+          If[Length[symTotals] == 0, Nothing,
+          ampTotals = SewingSymbolToAmpForm[#, npFull, qSpec] & /@ symTotals;
+          If[MemberQ[ampTotals, $Failed], Throw[$Failed, ConstructGeneralSewingAmplitudeRecords]];
           Table[
-          total = totals[[termIndex]];
+          symTotal = symTotals[[termIndex]];
+          totalRaw = ampTotals[[termIndex]];
+          totalTerms = Sum2List[Expand[totalRaw]];
+          total = If[TrueQ[OptionValue[FilterPhysicalSector]] && ! SewingContainsXSymbolQ[symTotal],
+            Total @ Select[
+              totalTerms,
+              SewingPhysicalAmpTermQ[
+                #,
+                npFull,
+                rightMassData["FullMass"],
+                Join[{leftSpin, leftSpin}, rightSpins],
+                cfPolarizations
+              ] &
+            ],
+            totalRaw
+          ];
+          If[total === 0, Nothing,
           If[TrueQ[OptionValue[CheckRight]],
             check = SewingRightRecordCheck[left, right, right["RightAmpDim"]];
             If[SewingCheckFailureQ[check],
@@ -1342,12 +1457,20 @@ ConstructGeneralSewingAmplitudeRecords[
               "QReplacement" -> Lookup[left, "QReplacement", None],
               "ContractionMode" -> contractionMode,
               "ContractionTermIndex" -> termIndex,
-              "ContractionTermCount" -> Length[totals],
+              "ContractionTermCount" -> Length[symTotals],
               "OpenAmpL" -> left["OpenAmpL"],
               "ClosedBasisAmpL" -> left["ClosedBasisAmpL"],
               "AuxiliarySpin" -> right["AuxiliarySpin"],
+              "AmpLSymbolForm" -> left["AmpLSymbolForm"],
+              "AmpLAmpForm" -> left["AmpLAmpForm"],
               "AmpL" -> left["AmpL"],
               "AmpR" -> right["AmpR"],
+              "SewingSymForm" -> symTotal,
+              "SewingDisplayForm" -> SewingDisplayForm[symTotal],
+              "SewingAmpFormRaw" -> totalRaw,
+              "SewingAmpFormTerms" -> totalTerms,
+              "SewingAmpForm" -> total,
+              "FormMap" -> <|"SymbolForm" -> symTotal, "DisplayForm" -> SewingDisplayForm[symTotal], "AmpFormRaw" -> totalRaw, "AmpForm" -> total|>,
               "TotalAmp" -> total,
               "ReducedAmp" -> SewingReducedMasslessGeneral[total, reducedOpts],
               "LeftRecord" -> left,
@@ -1365,8 +1488,8 @@ ConstructGeneralSewingAmplitudeRecords[
               ],
               rec
             ]
-          ],
-          {termIndex, Length[totals]}]
+          ]],
+          {termIndex, Length[symTotals]}]
           ]
         ]
       ],
@@ -1378,20 +1501,21 @@ ConstructGeneralSewingAmplitudeRecords[
   SewingLog[debug, "General.Rows", <|"RowsBeforeDedup" -> Length[rows]|>];
   key[rec_] := If[TrueQ[OptionValue[DeduplicateByReducedAmp]],
     ToString[rec["ReducedAmp"], InputForm],
-    ToString[{rec["J"], rec["LeftStructure"], rec["QComponent"], rec["AuxiliarySpin"], rec["AmpL"], rec["AmpR"], rec["ContractionMode"], rec["ContractionTermIndex"]}, InputForm]
+    ToString[{rec["J"], rec["LeftStructure"], rec["QComponent"], rec["AuxiliarySpin"], rec["SewingSymForm"], rec["SewingAmpForm"], rec["AmpR"], rec["ContractionMode"], rec["ContractionTermIndex"]}, InputForm]
   ];
   rows = DeleteDuplicatesBy[rows, key];
   SewingLog[debug, "General.Done", <|"Rows" -> Length[rows]|>];
   rows
 ];
 
-Options[SewingIndependentBlockFromRecords] = {ReturnRecords -> False};
+Options[SewingIndependentBlockFromRecords] = {ReturnRecords -> False, SewingOutputForm -> "SymbolForm"};
 SewingIndependentBlockFromRecords[records_List, basis_: Automatic, OptionsPattern[]] := Module[
-  {monoms, reduced, matrix, posIndep, selected, empty},
+  {monoms, reduced, matrix, posIndep, selected, empty, outputForm, outputAmps},
   empty = If[TrueQ[OptionValue[ReturnRecords]],
     <|"Records" -> {}, "Amplitudes" -> {}, "Matrix" -> {}, "Monomials" -> {}, "Positions" -> {}|>,
     {}
   ];
+  outputForm = OptionValue[SewingOutputForm];
   If[Length[records] == 0, Return[empty]];
   reduced = Lookup[records, "ReducedAmp", {}];
   monoms = Replace[basis, Automatic -> Poly2Singlet[reduced]];
@@ -1399,15 +1523,21 @@ SewingIndependentBlockFromRecords[records_List, basis_: Automatic, OptionsPatter
   matrix = Table[Coefficient[Expand[row], monom], {row, reduced}, {monom, monoms}];
   posIndep = FindIndependentBasisPos[matrix];
   selected = records[[posIndep]];
+  outputAmps = Switch[
+    outputForm,
+    "SymbolForm", SewingRecordSymbolForm /@ selected,
+    "AmpForm", SewingRecordAmpForm /@ selected,
+    _, SewingRecordSymbolForm /@ selected
+  ];
   If[TrueQ[OptionValue[ReturnRecords]],
     <|
       "Records" -> selected,
-      "Amplitudes" -> selected[[All, "TotalAmp"]],
+      "Amplitudes" -> outputAmps,
       "Matrix" -> matrix[[posIndep]],
       "Monomials" -> monoms,
       "Positions" -> posIndep
     |>,
-    {selected[[All, "TotalAmp"]], matrix[[posIndep]], monoms}
+    {outputAmps, matrix[[posIndep]], monoms}
   ]
 ];
 
@@ -1419,19 +1549,31 @@ SewingCoeffMatrixDataUnion[records_List, basis_List] := Module[{reduced, matrix}
   <|"Monomials" -> basis, "Matrix" -> matrix, "Rank" -> MatrixRank[matrix]|>
 ];
 
+SewingProjectReducedAmpToBasis[amp_, basis_List] := Expand[
+  Total[Coefficient[Expand[amp], #] # & /@ basis]
+];
+
 SewingValidMetaQ[meta_, np_Integer?Positive] :=
   ListQ[meta] && Length[meta] == 2 && ListQ[meta[[2]]] && Length[meta[[2]]] == np;
 
 SewingAmpMetaTerms[amp_, np_Integer?Positive, masses_] :=
   DeleteDuplicates[Amp2MetaInfo[#, np, mass -> masses] & /@ Sum2List[Expand[amp]]];
 
+SewingPhysicalAmpTermQ[
+  term_,
+  np_Integer?Positive,
+  masses_,
+  expectedSpins_List,
+  cfPolarizations_List
+] := Module[{meta = Amp2MetaInfo[term, np, mass -> masses]},
+  SewingValidMetaQ[meta, np] && meta[[1]] === expectedSpins && MemberQ[cfPolarizations, meta[[2]]]
+];
+
 SewingRecordPolarizationMatchQ[rec_Association, cfPolarizations_List, np_Integer?Positive, masses_] := Module[
-  {metas = SewingAmpMetaTerms[rec["TotalAmp"], np, masses], expectedSpins},
+  {terms = Sum2List[Expand[rec["TotalAmp"]]], expectedSpins},
+  If[SewingContainsXSymbolQ[Lookup[rec, "SewingSymForm", 0]], Return[True]];
   expectedSpins = Join[{rec["LeftSpin"], rec["LeftSpin"]}, rec["RightSpins"]];
-  Length[metas] > 0 && AllTrue[
-    metas,
-    SewingValidMetaQ[#, np] && #[[1]] === expectedSpins && MemberQ[cfPolarizations, #[[2]]] &
-  ]
+  AnyTrue[terms, SewingPhysicalAmpTermQ[#, np, masses, expectedSpins, cfPolarizations] &]
 ];
 
 Options[CompareGeneralSewingToCFBlocks] = Join[
@@ -1469,7 +1611,7 @@ CompareGeneralSewingToCFBlocks[
 ] := Module[
   {
     np, codeDim, leftMass, rightMassData, rightMass, fullMass, spins, leftPolarRange, cfPolarizations,
-    cfRows, sewingRows, basis, cfMatrix, sewingMatrix, joinedMatrix, debug
+    cfRows, sewingRows, basis, cfBasis, cfMatrix, sewingMatrix, joinedMatrix, debug
   },
   debug = TrueQ[OptionValue[SewingDebug]];
   np = 2 + Length[rightSpins];
@@ -1550,6 +1692,10 @@ CompareGeneralSewingToCFBlocks[
   ];
   SewingLog[debug, "Compare.Sewing", <|"SewingRecords" -> Length[sewingRows]|>];
   sewingRows = Append[#, "MetaTerms" -> SewingAmpMetaTerms[#["TotalAmp"], np, fullMass]] & /@ sewingRows;
+  cfBasis = Poly2Singlet[Lookup[cfRows, "ReducedAmp", {}]];
+  sewingRows = Append[#, "UnprojectedReducedAmp" -> #["ReducedAmp"]] & /@ sewingRows;
+  sewingRows = Append[#, "ReducedAmp" -> SewingProjectReducedAmpToBasis[#["ReducedAmp"], cfBasis]] & /@ sewingRows;
+  sewingRows = Select[sewingRows, Expand[#["ReducedAmp"]] =!= 0 &];
   basis = Poly2Singlet[Join[Lookup[cfRows, "ReducedAmp", {}], Lookup[sewingRows, "ReducedAmp", {}]]];
   cfMatrix = SewingCoeffMatrixDataUnion[cfRows, basis];
   sewingMatrix = SewingCoeffMatrixDataUnion[sewingRows, basis];
@@ -1581,6 +1727,7 @@ Options[ConstructIndepSewingBlock] = Join[
   {
     CheckAgainstCF -> False,
     FilterSewingByCFPolarization -> False,
+    SewingOutputForm -> "SymbolForm",
     SewingDebug -> False
   },
   DeleteCases[Options[CompareGeneralSewingToCFBlocks], (FilterSewingByCFPolarization -> _)]
@@ -1634,7 +1781,8 @@ ConstructIndepSewingBlock[
     If[records === $Failed, Return[$Failed]];
     block = SewingIndependentBlockFromRecords[
       records,
-      comparison["Monomials"]
+      comparison["Monomials"],
+      Sequence @@ FilterRules[{opts}, Options[SewingIndependentBlockFromRecords]]
     ];
     cfRank = comparison["CFMatrix"]["Rank"];
     blockRank = If[ListQ[block] && Length[block] == 3, MatrixRank[block[[2]]], -1];
@@ -1680,7 +1828,11 @@ ConstructIndepSewingBlock[
   ];
   records = SewingSortRecordsForBasis[records];
   If[records === $Failed, Return[$Failed]];
-  block = SewingIndependentBlockFromRecords[records];
+  block = SewingIndependentBlockFromRecords[
+    records,
+    Automatic,
+    Sequence @@ FilterRules[{opts}, Options[SewingIndependentBlockFromRecords]]
+  ];
   SewingLog[debug, "Independent.Done", <|"InputRecords" -> Length[records], "BlockRows" -> If[ListQ[block] && Length[block] >= 1, Length[block[[1]]], 0]|>];
   block
 ];

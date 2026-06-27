@@ -15,6 +15,7 @@ Print["Loading MassiveBasis..."];
 {ConstructRightProjectedJResidualRecords};
 {SewingContractionTerms, SymmetricSewContract};
 {ConstructGeneralSewingAmplitudeRecords, ConstructIndepSewingBlock, CompareGeneralSewingToCFBlocks};
+{SewingSymbolToAmpForm, SewingRecordSymbolForm, SewingRecordAmpForm};
 {SewingProjectAuxiliaryLabels, SewingNormalizeJTarget};
 {SewingIndependentBlockFromRecords, SewingCoeffMatrixDataUnion};
 {SewingSortData, SewingSortDataQ, SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder, SewingBasisSortKey, SewingSortRecordsForBasis};
@@ -37,7 +38,7 @@ Print["Loading MassiveBasis..."];
   RightMass, LeftMass, JRange, JMax, SewingContractionMode, VerifyAmpDim, Check3Point, CheckRight,
   CheckSewing, CheckVerbose, FilterPhysicalSector, FilterByAmpDim,
   DeduplicateByReducedAmp, LeftPolarizationRange, CFPolarizations,
-  FilterSewingByCFPolarization, CheckAgainstCF, SewingDebug
+  FilterSewingByCFPolarization, CheckAgainstCF, SewingDebug, SewingOutputForm
 };
 {$MassiveVerbose, $SewingDebug, SewingLog};
 
@@ -142,6 +143,7 @@ LeftPolarizationRange::usage = "LeftPolarizationRange is an option specifying le
 CFPolarizations::usage = "CFPolarizations is an option specifying full polarization sectors used in CF comparison.";
 FilterSewingByCFPolarization::usage = "FilterSewingByCFPolarization is an option restricting sewn records to sectors visible in the CF comparison.";
 CheckAgainstCF::usage = "CheckAgainstCF is an option causing ConstructIndepSewingBlock to validate sewn span rank against CF blocks.";
+SewingOutputForm::usage = "SewingOutputForm is an option selecting whether independent sewing basis amplitudes are returned in \"SymbolForm\" or \"AmpForm\".";
 
 If[!Global`$DEBUG, Begin["`Private`"]];
 

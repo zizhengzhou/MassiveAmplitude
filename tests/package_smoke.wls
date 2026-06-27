@@ -6,6 +6,9 @@ requiredSymbols = {
   ConstructGeneralSewingAmplitudeRecords,
   ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
+  SewingSymbolToAmpForm,
+  SewingRecordSymbolForm,
+  SewingRecordAmpForm,
   SewingContractionTerms,
   SymmetricSewContract,
   SewingSortRecordsForBasis,
@@ -50,6 +53,24 @@ If[missingOptions =!= {},
 
 If[$SewingDebug =!= False,
   Print["$SewingDebug should default to False."];
+  Exit[1]
+];
+
+If[
+  Expand[
+    SewingSymbolToAmpForm[Xhard ab[Q, 4] sb[Q, 4], 4] -
+      (sb[8, 7] - ab[1, 2]) (ab[1, 4] sb[1, 4] - ab[2, 4] sb[2, 4])
+  ] =!= 0,
+  Print["SewingSymbolToAmpForm should map Xhard and default Q to p1-p2."];
+  Exit[1]
+];
+
+If[
+  Expand[
+    SewingSymbolToAmpForm[Xsoft ab[Q, 4] sb[Q, 4], 4, qSym] -
+      (sb[8, 7] + ab[1, 2]) ab[qSym, 4] sb[qSym, 4]
+  ] =!= 0,
+  Print["SewingSymbolToAmpForm should keep symbolic QReplacement labels symbolic."];
   Exit[1]
 ];
 
