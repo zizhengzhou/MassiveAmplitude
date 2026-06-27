@@ -45,7 +45,8 @@ publicSymbols = {
   ReturnRecords,
   ReplaceQInFinalSymbolForm,
   SewingOutputForm,
-  ReturnProjectionData
+  ReturnProjectionData,
+  SewingPerformanceTrace
 };
 
 missingUsage = Select[
@@ -114,6 +115,11 @@ requiredUsageFragments = {
     "BasisByRelativeChiralOrder",
     "SU3IndexDictionaries",
     "J block diagnostics"
+  },
+  SewingPerformanceTrace -> {
+    "per-stage timing",
+    "cache hit/miss",
+    "ReturnProjectionData"
   }
 };
 
