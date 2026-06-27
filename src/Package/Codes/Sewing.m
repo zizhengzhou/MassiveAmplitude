@@ -128,9 +128,9 @@ CompareGeneralSewingToCFBlocks::usage =
 ConstructSewingRelativeChiralBasis::usage =
   "ConstructSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, rightPolarization, opts] returns an association whose keys are relative chiral-order labels and whose values are independent symbolic sewing basis amplitudes. It first verifies CF/sewing span equivalence and a strict selected-count equality before returning. By default it replaces final Q factors using `QReplacement -> {1,-2}` while preserving `Xhard` and `Xsoft`; use `ReplaceQInFinalSymbolForm -> False` to keep Q visible. ConstructSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, rightPolarization, opts] specifies the right-side mass option explicitly.";
 ProjectSewingAmplitudeRecords::usage =
-  "ProjectSewingAmplitudeRecords[records, fullPolarization, identicalInfo, localCFBlock, opts] computes the identical-particle Lorentz projection for one already fixed full polarization sector. The records are reduced on the supplied local CF basis, permutation matrices are computed from internal amp forms, and the result is an association containing the selected Lorentz records, permutation matrices, Young operator, independent positions, and J block diagnostics.";
+  "ProjectSewingAmplitudeRecords[records, fullPolarization, identicalInfo, localCFBlock, opts] computes the Lorentz part of the identical-particle Young projection for one fixed full polarization sector. `records` must be sewing records carrying `SewingAmpForm`, `SewingSymForm`, `ReducedAmp`, `PointCount`, and full `Mass` metadata. `localCFBlock` must be the matching ConstructIndepCFBlock result {cfAmplitudes, cfCoefficientMatrix, cfMonomialBasis}. The function first verifies local CF/sewing span equality, then computes permutation matrices from internal amp forms, selects independent Young-projected Lorentz records with FindIndependentBasisPos, and returns an association containing `Records`, `RecordsBeforeIdentical`, `LorentzOperatorDictionary`, `LorentzYoungOperator`, `IndependentPositions`, ranks, and J block diagnostics. SewingDebug -> True prints default-off diagnostics.";
 ConstructProjectedSewingRelativeChiralBasis::usage =
-  "ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, identicalParam, opts] enumerates the physically inequivalent full polarization sectors, constructs the CF-equivalent sewn basis in each sector, applies right-side identical-particle projection, optionally attaches SU(3) color structures by direct product, and returns an association keyed by relative chiral order. ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, identicalParam, opts] specifies right-side massive labels explicitly. With ReturnProjectionData -> True it returns detailed sector records instead of only the grouped basis.";
+  "ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, identicalParam, opts] constructs the projected independent sewing basis for an equal-spin heavy pair and right-side particles. It enumerates the physically inequivalent full polarization sectors using GenerateNeedCFBlocks and FilterCFBlocksByIdentical, verifies each nonzero sector against the matching ConstructIndepCFBlock span, applies right-side identical-particle Young projection, and optionally attaches SU(3) color structures through a Lorentz/color direct product. Independent representatives after Lorentz/color projection are selected with FindIndependentBasisPos. The default output is an association `relativeChiralOrder -> symbolicBasisList`; without SU(3) the entries are symbolic Lorentz forms, while with su3ShapeList the entries are associations containing `LorentzSymbolForm`, `SU3Basis`, `SU3IndexDictionary`, and `DirectProduct`. ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, identicalParam, opts] specifies right-side massive labels explicitly. Main options include RightMass, LeftMass, su3ShapeList, QReplacement, ReplaceQInFinalSymbolForm, ReturnProjectionData, and SewingDebug. With ReturnProjectionData -> True the return value is an association with `BasisByRelativeChiralOrder`, `SectorResults`, `Spins`, `Mass`, `IdenticalTypeList`, `PhysicalBlocks`, `SU3ShapeList`, and `SU3IndexDictionaries`.";
 
 SewingApplyLeftQReplacement::badq =
   "Unsupported QReplacement specification `1`. Use a symbol, an integer label, or a signed integer list such as {1,2} or {1,-2}.";
@@ -149,15 +149,15 @@ ProjectSewingAmplitudeRecords::basis =
 ProjectSewingAmplitudeRecords::empty =
   "No sewing records remain for full polarization `1` after local CF-sector filtering.";
 ConstructProjectedSewingRelativeChiralBasis::identical =
-  "Identical-particle projection is only implemented for right-side particles. Invalid identical groups: `1`.";
+  "Identical-particle projection in ConstructProjectedSewingRelativeChiralBasis is only implemented for right-side particle labels 3,4,... . Invalid identical groups containing left labels 1 or 2: `1`.";
 ConstructProjectedSewingRelativeChiralBasis::cf =
   "CF block construction failed or vanished for block `1` with mass `2`.";
 ConstructProjectedSewingRelativeChiralBasis::sewing =
   "Sewing construction failed for full polarization `1`.";
 ConstructProjectedSewingRelativeChiralBasis::complete =
-  "Sewing span failed CF completeness for full polarization `1`: CF rank `2`, sewing rank `3`, joined rank `4`.";
+  "Sewing span failed the required CF completeness check for full polarization `1`: CF rank `2`, sewing rank `3`, joined rank `4`.";
 ConstructProjectedSewingRelativeChiralBasis::su3 =
-  "SU(3) color basis construction failed for identical data `1` and shapes `2`.";
+  "SU(3) color basis construction failed for identical data `1` and su3ShapeList `2`. Check that identical particles carry compatible SU(3) shapes.";
 ConstructProjectedSewingRelativeChiralBasis::count =
   "Projected sewing count check failed: `1`.";
 

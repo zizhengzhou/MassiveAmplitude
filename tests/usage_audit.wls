@@ -93,4 +93,47 @@ If[missingMessages =!= {},
   Exit[1]
 ];
 
+requiredUsageFragments = {
+  ConstructProjectedSewingRelativeChiralBasis -> {
+    "identicalParam",
+    "su3ShapeList",
+    "ReturnProjectionData",
+    "BasisByRelativeChiralOrder",
+    "SU3IndexDictionary",
+    "DirectProduct",
+    "FindIndependentBasisPos"
+  },
+  ProjectSewingAmplitudeRecords -> {
+    "full polarization",
+    "ConstructIndepCFBlock",
+    "FindIndependentBasisPos",
+    "LorentzYoungOperator",
+    "J block diagnostics"
+  },
+  ReturnProjectionData -> {
+    "BasisByRelativeChiralOrder",
+    "SU3IndexDictionaries",
+    "J block diagnostics"
+  }
+};
+
+missingUsageFragments = DeleteCases[
+  Flatten[
+    KeyValueMap[
+      Function[{symbol, fragments},
+        Select[fragments, ! StringContainsQ[MessageName[symbol, "usage"], #] &] /. 
+          fragment_String :> {symbol, fragment}
+      ],
+      Association[requiredUsageFragments]
+    ],
+    1
+  ],
+  {}
+];
+
+If[missingUsageFragments =!= {},
+  Print["Missing required usage fragments: ", missingUsageFragments];
+  Exit[1]
+];
+
 Print["usage audit ok"];
