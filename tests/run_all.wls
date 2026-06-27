@@ -15,6 +15,8 @@ scripts = {
   "sewing_symbol_amp_form_separation.wls",
   "sewing_left_open_extreme_structures.wls",
   "sewing_relative_chiral_basis_interface.wls",
+  "projected_sewing_probe.wls",
+  "projected_sewing_su3_probe.wls",
   "section_5_2_bbuf_reproduce.wls",
   "section_5_2_split_sum_independent_counts.wls",
   "section_5_2_chiral_order_reproduce.wls"

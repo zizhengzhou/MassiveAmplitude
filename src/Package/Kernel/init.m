@@ -12,6 +12,7 @@ $CodeFiles = FileNameJoin[{$MassiveDir, "Codes", #}] & /@ {
   "Tools.m",
   "SSYT.m",
   "Permutation.m",
+  "SU3.m",
   "Amplitude.m",
   "CFblocks.m",
   "Operator.m",

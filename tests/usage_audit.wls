@@ -16,6 +16,8 @@ publicSymbols = {
   ConstructIndepSewingBlock,
   CompareGeneralSewingToCFBlocks,
   ConstructSewingRelativeChiralBasis,
+  ProjectSewingAmplitudeRecords,
+  ConstructProjectedSewingRelativeChiralBasis,
   SewingSymbolToAmpForm,
   SewingReplaceQInSymbolForm,
   SewingDisplayForm,
@@ -42,7 +44,8 @@ publicSymbols = {
   AutoJNoRightWindow,
   ReturnRecords,
   ReplaceQInFinalSymbolForm,
-  SewingOutputForm
+  SewingOutputForm,
+  ReturnProjectionData
 };
 
 missingUsage = Select[
@@ -67,6 +70,14 @@ messageSymbols = {
   ConstructSewingRelativeChiralBasis::cfcheck,
   ConstructSewingRelativeChiralBasis::sort,
   ConstructSewingRelativeChiralBasis::count,
+  ProjectSewingAmplitudeRecords::basis,
+  ProjectSewingAmplitudeRecords::empty,
+  ConstructProjectedSewingRelativeChiralBasis::identical,
+  ConstructProjectedSewingRelativeChiralBasis::cf,
+  ConstructProjectedSewingRelativeChiralBasis::sewing,
+  ConstructProjectedSewingRelativeChiralBasis::complete,
+  ConstructProjectedSewingRelativeChiralBasis::su3,
+  ConstructProjectedSewingRelativeChiralBasis::count,
   SewingSymbolToAmpForm::badq,
   SewingReplaceQInSymbolForm::badq,
   SewingSortRecordsForBasis::sortdata,

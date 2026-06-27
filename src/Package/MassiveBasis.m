@@ -15,6 +15,7 @@ Print["Loading MassiveBasis..."];
 {ConstructRightProjectedJResidualRecords};
 {SewingContractionTerms, SymmetricSewContract};
 {ConstructGeneralSewingAmplitudeRecords, ConstructIndepSewingBlock, CompareGeneralSewingToCFBlocks, ConstructSewingRelativeChiralBasis};
+{ConstructProjectedSewingRelativeChiralBasis, ProjectSewingAmplitudeRecords};
 {SewingSymbolToAmpForm, SewingReplaceQInSymbolForm, SewingDisplayForm, SewingRecordSymbolForm, SewingRecordAmpForm};
 {SewingProjectAuxiliaryLabels, SewingNormalizeJTarget};
 {SewingIndependentBlockFromRecords, SewingCoeffMatrixDataUnion};
@@ -39,7 +40,7 @@ Print["Loading MassiveBasis..."];
   CheckSewing, CheckVerbose, FilterPhysicalSector, FilterByAmpDim,
   DeduplicateByReducedAmp, LeftPolarizationRange, CFPolarizations,
   FilterSewingByCFPolarization, CheckAgainstCF, SewingDebug, SewingOutputForm, ReturnRecords,
-  AutoJNoRightWindow, ReplaceQInFinalSymbolForm
+  AutoJNoRightWindow, ReplaceQInFinalSymbolForm, ReturnProjectionData
 };
 {$MassiveVerbose, $SewingDebug, SewingLog};
 
@@ -148,6 +149,7 @@ SewingOutputForm::usage = "SewingOutputForm is an option selecting whether indep
 ReturnRecords::usage = "ReturnRecords is an option for independent sewing basis constructors. When True, return an association with selected records, amplitudes, matrix, monomials, and positions instead of only the basis triple.";
 AutoJNoRightWindow::usage = "AutoJNoRightWindow is an option specifying how many consecutive J sectors with no right-side records stop the automatic sewing J scan.";
 ReplaceQInFinalSymbolForm::usage = "ReplaceQInFinalSymbolForm is an option for ConstructSewingRelativeChiralBasis. When True, final symbolic output replaces Q by QReplacement while preserving Xhard and Xsoft.";
+ReturnProjectionData::usage = "ReturnProjectionData is an option for projected sewing constructors. When True, return detailed polarization-sector, Lorentz, color, and direct-product projection data in addition to the grouped basis.";
 
 If[!Global`$DEBUG, Begin["`Private`"]];
 

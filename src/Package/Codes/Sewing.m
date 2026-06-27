@@ -31,7 +31,10 @@ ClearAll[
   SewingSortData, SewingSortDataQ,
   SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder,
   SewingBasisSortKey, SewingSortRecordsForBasis,
-  ConstructSewingRelativeChiralBasis
+  ConstructSewingRelativeChiralBasis,
+  SewingIdenticalTypeList, SewingMatrixBlockDiagonalByJQ, SewingTotalYoungOperator,
+  SewingColorDataForIdenticalInfo, SewingDirectProductBasisItems, SewingGroupProjectedItemsByChiralOrder,
+  ProjectSewingAmplitudeRecords, ConstructProjectedSewingRelativeChiralBasis
 ];
 
 ConstructLeft3PointOpenBasis::usage =
@@ -124,6 +127,10 @@ CompareGeneralSewingToCFBlocks::usage =
   "CompareGeneralSewingToCFBlocks[leftSpin, rightSpins, ampDim, rightPolarization, opts] compares the sewn records against matching `ConstructIndepCFBlock` results after massless reduction. It returns the sewn/CF records, common monomial basis, coefficient matrices, ranks, and the completeness verdict `CompleteQ`.";
 ConstructSewingRelativeChiralBasis::usage =
   "ConstructSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, rightPolarization, opts] returns an association whose keys are relative chiral-order labels and whose values are independent symbolic sewing basis amplitudes. It first verifies CF/sewing span equivalence and a strict selected-count equality before returning. By default it replaces final Q factors using `QReplacement -> {1,-2}` while preserving `Xhard` and `Xsoft`; use `ReplaceQInFinalSymbolForm -> False` to keep Q visible. ConstructSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, rightPolarization, opts] specifies the right-side mass option explicitly.";
+ProjectSewingAmplitudeRecords::usage =
+  "ProjectSewingAmplitudeRecords[records, fullPolarization, identicalInfo, localCFBlock, opts] computes the identical-particle Lorentz projection for one already fixed full polarization sector. The records are reduced on the supplied local CF basis, permutation matrices are computed from internal amp forms, and the result is an association containing the selected Lorentz records, permutation matrices, Young operator, independent positions, and J block diagnostics.";
+ConstructProjectedSewingRelativeChiralBasis::usage =
+  "ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, identicalParam, opts] enumerates the physically inequivalent full polarization sectors, constructs the CF-equivalent sewn basis in each sector, applies right-side identical-particle projection, optionally attaches SU(3) color structures by direct product, and returns an association keyed by relative chiral order. ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, identicalParam, opts] specifies right-side massive labels explicitly. With ReturnProjectionData -> True it returns detailed sector records instead of only the grouped basis.";
 
 SewingApplyLeftQReplacement::badq =
   "Unsupported QReplacement specification `1`. Use a symbol, an integer label, or a signed integer list such as {1,2} or {1,-2}.";
@@ -137,6 +144,22 @@ ConstructSewingRelativeChiralBasis::sort =
   "Could not sort sewing records by relative chiral order because required metadata is missing.";
 ConstructSewingRelativeChiralBasis::count =
   "Relative chiral basis count check failed: `1`.";
+ProjectSewingAmplitudeRecords::basis =
+  "The supplied local CF block is not usable: expected {basis amplitudes, coefficient matrix, reduced monomial basis}, got `1`.";
+ProjectSewingAmplitudeRecords::empty =
+  "No sewing records remain for full polarization `1` after local CF-sector filtering.";
+ConstructProjectedSewingRelativeChiralBasis::identical =
+  "Identical-particle projection is only implemented for right-side particles. Invalid identical groups: `1`.";
+ConstructProjectedSewingRelativeChiralBasis::cf =
+  "CF block construction failed or vanished for block `1` with mass `2`.";
+ConstructProjectedSewingRelativeChiralBasis::sewing =
+  "Sewing construction failed for full polarization `1`.";
+ConstructProjectedSewingRelativeChiralBasis::complete =
+  "Sewing span failed CF completeness for full polarization `1`: CF rank `2`, sewing rank `3`, joined rank `4`.";
+ConstructProjectedSewingRelativeChiralBasis::su3 =
+  "SU(3) color basis construction failed for identical data `1` and shapes `2`.";
+ConstructProjectedSewingRelativeChiralBasis::count =
+  "Projected sewing count check failed: `1`.";
 
 SewingJFactorQ[head_][factor_] :=
   MatchQ[factor, _[_, _]] && Head[factor] === head && MemberQ[List @@ factor, J];
@@ -1290,9 +1313,17 @@ SewingAutoJSearchLimit[leftSpin_, ampDim_Integer, rightSpins_List] := Module[
 
 SewingDefaultRightMass[np_Integer?Positive] := If[np >= 3, {3}, {}];
 SewingMassLabelValue[i_Integer?Positive] :=
-  "\!\(\*SubscriptBox[\(m\), \(" <> ToString[i] <> "\)]\)";
+  ToExpression["m" <> ToString[i]];
 SewingMassVectorFromPositions[positions_List, np_Integer?Positive] :=
   Table[If[MemberQ[positions, i], SewingMassLabelValue[i], 0], {i, np}];
+SewingLeftMassVector[leftMassIn_] := Which[
+  leftMassIn === All,
+    SewingMassVectorFromPositions[{1, 2}, 2],
+  ListQ[leftMassIn] && And @@ ((IntegerQ[#] && 1 <= # <= 2) & /@ leftMassIn),
+    SewingMassVectorFromPositions[leftMassIn, 2],
+  True,
+    MassOption[leftMassIn, 2]
+];
 
 SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List] := Module[
   {np = 2 + Length[rightSpins], rightMass, rightPositionQ, rightVectorQ, leftVector, rightVector},
@@ -1301,7 +1332,7 @@ SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List] := Module[
   rightVectorQ = ListQ[rightMass] && Length[rightMass] == Length[rightSpins] && ! rightPositionQ;
   Which[
     rightPositionQ,
-      leftVector = MassOption[leftMassIn, 2];
+      leftVector = SewingLeftMassVector[leftMassIn];
       rightVector = SewingMassVectorFromPositions[rightMass, np];
       <|
         "RightConstructMass" -> rightVector,
@@ -1309,7 +1340,7 @@ SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List] := Module[
         "PhysicalRightMass" -> rightMass
       |>,
     rightVectorQ,
-      leftVector = MassOption[leftMassIn, 2];
+      leftVector = SewingLeftMassVector[leftMassIn];
       <|
         "RightConstructMass" -> Join[{0, 0}, rightMass],
         "FullMass" -> Join[leftVector, rightMass],
@@ -1318,7 +1349,7 @@ SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List] := Module[
     True,
       <|
         "RightConstructMass" -> rightMass,
-        "FullMass" -> Join[MassOption[leftMassIn, 2], Drop[MassOption[rightMass, np], 2]],
+        "FullMass" -> Join[SewingLeftMassVector[leftMassIn], Drop[MassOption[rightMass, np], 2]],
         "PhysicalRightMass" -> Flatten[Position[Drop[MassOption[rightMass, np], 2], Except[0]]] + 2
       |>
   ]
@@ -2051,4 +2082,441 @@ ConstructSewingRelativeChiralBasis[
     Return[$Failed]
   ];
   KeySort[ampsByOrder]
+];
+
+SewingIdenticalTypeList[spins_List, identicalParam_List] :=
+  If[identicalParam === {},
+    {},
+    (# ~ Append ~ If[OddQ[2 spins[[#[[1]]]]], "A", "S"]) & /@ identicalParam
+  ];
+
+SewingMatrixBlockDiagonalByJQ[matrix_?MatrixQ, records_List] := Module[
+  {jValues, groups, offBlocks},
+  If[Length[matrix] == 0 || Length[records] == 0, Return[True]];
+  jValues = Lookup[records, "J", Missing["NoJ"]];
+  If[MemberQ[jValues, Missing["NoJ"]], Return[False]];
+  groups = Values[PositionIndex[jValues]];
+  offBlocks = Flatten[
+    Table[
+      If[i == j, Nothing, matrix[[groups[[i]], groups[[j]]]]],
+      {i, Length[groups]}, {j, Length[groups]}
+    ],
+    2
+  ];
+  FreeQ[offBlocks, Except[0]]
+];
+
+SewingTotalYoungOperator[operatorDict_Association, identicalInfo_List, identicalPolyDict_Association] := Module[
+  {nonemptyInfo = Select[identicalInfo, KeyExistsQ[identicalPolyDict, #] && KeyExistsQ[operatorDict, #] &]},
+  If[Length[nonemptyInfo] == 0,
+    If[Length[operatorDict] == 0,
+      {},
+      IdentityMatrix[Length[First[First /@ Values[operatorDict]][[2]]]]
+    ],
+    Dot @@ Table[identicalPolyDict[id] /. operatorDict[id], {id, nonemptyInfo}]
+  ]
+];
+
+SewingColorDataForIdenticalInfo[su3Shapes_List, identicalInfo_List, debug_: False] := Module[
+  {su3IndDict, su3Basis, su3IdenticalOpDict},
+  If[Length[su3Shapes] == 0 || Count[su3Shapes, ""] == Length[su3Shapes],
+    Return[
+      <|
+        "HasSU3" -> False,
+        "SU3IndexDictionary" -> <||>,
+        "SU3Basis" -> {1},
+        "SU3OperatorDictionary" -> <||>
+      |>
+    ]
+  ];
+  {su3IndDict, su3Basis, su3IdenticalOpDict} =
+    AuxConstructIdenticalColorBasis[su3Shapes, identicalInfo, IYT];
+  SewingLog[debug, "Projected.SU3", <|"IdenticalInfo" -> identicalInfo, "ColorBasisCount" -> Length[su3Basis]|>];
+  <|
+    "HasSU3" -> True,
+    "SU3IndexDictionary" -> su3IndDict,
+    "SU3Basis" -> su3Basis,
+    "SU3OperatorDictionary" -> su3IdenticalOpDict
+  |>
+];
+
+SewingDirectProductBasisItems[lorentzRecords_List, colorBasis_List, su3IndDict_Association, hasSU3_] := Flatten[
+  Table[
+    If[TrueQ[hasSU3],
+      <|
+        "LorentzRecord" -> lorentzRecord,
+        "LorentzSymbolForm" -> SewingRecordSymbolForm[lorentzRecord],
+        "ColorBasis" -> colorElement,
+        "SU3Basis" -> colorElement,
+        "SU3IndexDictionary" -> su3IndDict,
+        "DirectProduct" -> {SewingRecordSymbolForm[lorentzRecord], colorElement},
+        "J" -> lorentzRecord["J"],
+        "RelativeChiralOrder" -> SewingRelativeChiralOrder[lorentzRecord]
+      |>,
+      <|
+        "LorentzRecord" -> lorentzRecord,
+        "LorentzSymbolForm" -> SewingRecordSymbolForm[lorentzRecord],
+        "DirectProduct" -> SewingRecordSymbolForm[lorentzRecord],
+        "J" -> lorentzRecord["J"],
+        "RelativeChiralOrder" -> SewingRelativeChiralOrder[lorentzRecord]
+      |>
+    ],
+    {lorentzRecord, lorentzRecords}, {colorElement, colorBasis}
+  ],
+  1
+];
+
+SewingGroupProjectedItemsByChiralOrder[items_List, replaceQ_, qSpec_] := Module[
+  {formatItem},
+  formatItem[item_Association] := Module[
+    {lorentz = item["LorentzSymbolForm"], replaced},
+    replaced = If[TrueQ[replaceQ], SewingReplaceQInSymbolForm[lorentz, qSpec], lorentz];
+    If[replaced === $Failed, replaced = lorentz];
+    If[KeyExistsQ[item, "SU3Basis"],
+      KeyDrop[Append[item, "LorentzSymbolForm" -> replaced], {"LorentzRecord"}],
+      replaced
+    ]
+  ];
+  KeySort @ Association @ KeyValueMap[#1 -> (formatItem /@ #2) &, GroupBy[items, #["RelativeChiralOrder"] &]]
+];
+
+Options[ProjectSewingAmplitudeRecords] = {
+  SewingDebug -> False
+};
+ProjectSewingAmplitudeRecords[
+  records_List,
+  fullPolarization_List,
+  identicalInfo_List,
+  localCFBlock_,
+  opts : OptionsPattern[]
+] := Module[
+  {
+    debug, cfAmps, cfMatrix, cfBasis, pointCount, masses, filteredRecords, projectedRecords,
+    sewingMatrixData, joinedMatrixData, sortedRecords, independentBlock, selectedRecords,
+    selectedMatrix, lorentzOperatorDict, identicalPolyDict, lorentzYoungOperator,
+    independentPositions, projectedRecordsAfterIdentical, jBlockDiagnostics
+  },
+  debug = TrueQ[OptionValue[SewingDebug]];
+  If[! ListQ[localCFBlock] || Length[localCFBlock] < 3,
+    Message[ProjectSewingAmplitudeRecords::basis, localCFBlock];
+    Return[$Failed]
+  ];
+  {cfAmps, cfMatrix, cfBasis} = localCFBlock[[1 ;; 3]];
+  pointCount = Lookup[First[records, <||>], "PointCount", Length[fullPolarization]];
+  masses = Lookup[First[records, <||>], "Mass", Automatic];
+  filteredRecords = Select[records, SewingRecordPolarizationMatchQ[#, {fullPolarization}, pointCount, masses] &];
+  If[Length[filteredRecords] == 0,
+    Message[ProjectSewingAmplitudeRecords::empty, fullPolarization];
+    Return[$Failed]
+  ];
+  projectedRecords = Append[#, "UnprojectedReducedAmp" -> #["ReducedAmp"]] & /@ filteredRecords;
+  projectedRecords = Append[#, "ReducedAmp" -> SewingProjectReducedAmpToBasis[#["ReducedAmp"], cfBasis]] & /@ projectedRecords;
+  projectedRecords = Select[projectedRecords, Expand[#["ReducedAmp"]] =!= 0 &];
+  If[Length[projectedRecords] == 0,
+    Message[ProjectSewingAmplitudeRecords::empty, fullPolarization];
+    Return[$Failed]
+  ];
+  sewingMatrixData = SewingCoeffMatrixDataUnion[projectedRecords, cfBasis];
+  joinedMatrixData = SewingCoeffMatrixDataUnion[
+    Join[
+      Table[<|"ReducedAmp" -> Total[MapThread[#1 #2 &, {cfMatrix[[i]], cfBasis}]]|>, {i, Length[cfMatrix]}],
+      projectedRecords
+    ],
+    cfBasis
+  ];
+  If[! (MatrixRank[cfMatrix] == sewingMatrixData["Rank"] == joinedMatrixData["Rank"]),
+    Return[
+      <|
+        "CompleteQ" -> False,
+        "CFRank" -> MatrixRank[cfMatrix],
+        "SewingRank" -> sewingMatrixData["Rank"],
+        "JoinedRank" -> joinedMatrixData["Rank"],
+        "FilteredRecords" -> filteredRecords,
+        "ProjectedRecords" -> projectedRecords
+      |>
+    ]
+  ];
+  sortedRecords = SewingSortRecordsForBasis[projectedRecords];
+  If[sortedRecords === $Failed, Return[$Failed]];
+  independentBlock = SewingIndependentBlockFromRecords[
+    sortedRecords,
+    cfBasis,
+    ReturnRecords -> True,
+    SewingOutputForm -> "SymbolForm"
+  ];
+  If[! AssociationQ[independentBlock], Return[$Failed]];
+  selectedRecords = independentBlock["Records"];
+  selectedMatrix = independentBlock["Matrix"];
+  lorentzOperatorDict = If[Length[identicalInfo] == 0,
+    <||>,
+    GetCFBlockPermuteOperatorDict[
+      {SewingRecordAmpForm /@ selectedRecords, selectedMatrix, cfBasis},
+      identicalInfo,
+      pointCount
+    ]
+  ];
+  identicalPolyDict = GetTotalPermutedPolyDict[identicalInfo];
+  lorentzYoungOperator = If[Length[identicalInfo] == 0,
+    IdentityMatrix[Length[selectedRecords]],
+    SewingTotalYoungOperator[lorentzOperatorDict, identicalInfo, identicalPolyDict]
+  ];
+  independentPositions = If[Length[identicalInfo] == 0,
+    Range[Length[selectedRecords]],
+    FindIndependentBasisPos[lorentzYoungOperator]
+  ];
+  projectedRecordsAfterIdentical = selectedRecords[[independentPositions]];
+  jBlockDiagnostics = Association @ Table[
+    id -> <|
+      "LorentzBlockDiagonalByJ" -> AllTrue[Values[Association[lorentzOperatorDict[id]]], SewingMatrixBlockDiagonalByJQ[#, selectedRecords] &],
+      "YoungOperatorBlockDiagonalByJ" -> SewingMatrixBlockDiagonalByJQ[lorentzYoungOperator, selectedRecords]
+    |>,
+    {id, Keys[lorentzOperatorDict]}
+  ];
+  SewingLog[
+    debug,
+    "Projected.Lorentz",
+    <|
+      "FullPolarization" -> fullPolarization,
+      "SelectedBeforeIdentical" -> Length[selectedRecords],
+      "SelectedAfterIdentical" -> Length[projectedRecordsAfterIdentical]
+    |>
+  ];
+  <|
+    "CompleteQ" -> True,
+    "CFRank" -> MatrixRank[cfMatrix],
+    "SewingRank" -> sewingMatrixData["Rank"],
+    "JoinedRank" -> joinedMatrixData["Rank"],
+    "FullPolarization" -> fullPolarization,
+    "IdenticalInfo" -> identicalInfo,
+    "CFBlock" -> localCFBlock,
+    "CFBasis" -> cfBasis,
+    "RecordsBeforeIdentical" -> selectedRecords,
+    "Records" -> projectedRecordsAfterIdentical,
+    "Matrix" -> selectedMatrix,
+    "LorentzOperatorDictionary" -> lorentzOperatorDict,
+    "IdenticalPolynomialDictionary" -> identicalPolyDict,
+    "LorentzYoungOperator" -> lorentzYoungOperator,
+    "IndependentPositions" -> independentPositions,
+    "JBlockDiagnostics" -> jBlockDiagnostics
+  |>
+];
+
+Options[ConstructProjectedSewingRelativeChiralBasis] = Join[
+  {
+    RightMass -> Automatic,
+    LeftMass -> {1, 2},
+    su3ShapeList -> {},
+    ReturnProjectionData -> False,
+    ReplaceQInFinalSymbolForm -> True,
+    SewingDebug -> False
+  },
+  Options[ConstructGeneralSewingAmplitudeRecords],
+  Options[SewingReducedMasslessGeneral]
+];
+ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin_,
+  rightSpins_List,
+  rightMass_,
+  ampDim_Integer,
+  identicalParam_List,
+  opts : OptionsPattern[]
+] := ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin,
+  rightSpins,
+  ampDim,
+  identicalParam,
+  Sequence @@ Join[{RightMass -> rightMass}, {opts}]
+];
+
+ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin_,
+  rightSpins_List,
+  ampDim_Integer,
+  identicalParam_List,
+  opts : OptionsPattern[]
+] := Module[
+  {
+    debug, pointCount, spins, codeDim, leftMass, rightMassData, fullMass,
+    invalidIdenticals, identicalTypeList, candidateBlocks, physicalBlocks,
+    recordsByRightPolarization = <||>, colorCache = <||>, sectorResults,
+    allProjectedItems, groupedBasis, getRecordsForRightPolarization,
+    getColorData, fullPolarization, rightPolarization, localCFBlock,
+    identicalInfo, sewingRecords, projection, colorData, totalOperator,
+    directProductItems, projectedItems, independentPositions, colorOperatorDict,
+    colorBasis, hasSU3, su3IndDict, totalIdenticalOperator, totalJDiagnostics,
+    sectorOutput, expectedDirectCount, outputCount
+  },
+  debug = TrueQ[OptionValue[SewingDebug]];
+  pointCount = 2 + Length[rightSpins];
+  spins = Join[{leftSpin, leftSpin}, rightSpins];
+  codeDim = SewingCodeDimFromAmpDim[ampDim, pointCount];
+  leftMass = OptionValue[LeftMass];
+  rightMassData = SewingMassOptionData[leftMass, OptionValue[RightMass], rightSpins];
+  fullMass = rightMassData["FullMass"];
+  invalidIdenticals = Select[identicalParam, ! FreeQ[#, 1 | 2] &];
+  If[invalidIdenticals =!= {},
+    Message[ConstructProjectedSewingRelativeChiralBasis::identical, invalidIdenticals];
+    Return[$Failed]
+  ];
+  identicalTypeList = SewingIdenticalTypeList[spins, identicalParam];
+  candidateBlocks = GenerateNeedCFBlocks[spins, codeDim, mass -> fullMass];
+  physicalBlocks = FilterCFBlocksByIdentical[candidateBlocks, identicalParam];
+  SewingLog[
+    debug,
+    "Projected.Blocks",
+    <|"CandidateBlocks" -> Length[candidateBlocks], "PhysicalBlocks" -> Length[physicalBlocks]|>
+  ];
+  getRecordsForRightPolarization[rightPolarization_List] := If[
+    KeyExistsQ[recordsByRightPolarization, rightPolarization],
+    recordsByRightPolarization[rightPolarization],
+    recordsByRightPolarization[rightPolarization] = ConstructGeneralSewingAmplitudeRecords[
+      leftSpin,
+      rightSpins,
+      ampDim,
+      rightPolarization,
+      Sequence @@ Join[
+        FilterRules[{opts}, Options[ConstructGeneralSewingAmplitudeRecords]],
+        {
+          RightMass -> rightMassData["PhysicalRightMass"],
+          LeftMass -> leftMass,
+          PointCount -> pointCount,
+          FilterPhysicalSector -> False
+        }
+      ]
+    ]
+  ];
+  getColorData[info_List] := If[
+    KeyExistsQ[colorCache, info],
+    colorCache[info],
+    colorCache[info] = SewingColorDataForIdenticalInfo[OptionValue[su3ShapeList], info, debug]
+  ];
+  sectorResults = Reap[
+    Do[
+      fullPolarization = block[[2]];
+      rightPolarization = fullPolarization[[3 ;;]];
+      identicalInfo = Quiet@Check[ReAssignIdentical[fullPolarization, identicalTypeList], {}];
+      localCFBlock = Quiet@Check[
+        ConstructIndepCFBlock[spins, block[[1]], fullPolarization, mass -> fullMass],
+        $Failed
+      ];
+      If[! ListQ[localCFBlock] || Length[localCFBlock] < 3 || Length[localCFBlock[[1]]] == 0,
+        Continue[]
+      ];
+      sewingRecords = getRecordsForRightPolarization[rightPolarization];
+      If[sewingRecords === $Failed,
+        Message[ConstructProjectedSewingRelativeChiralBasis::sewing, fullPolarization];
+        Return[$Failed]
+      ];
+      sewingRecords = Append[#, "Mass" -> fullMass] & /@ sewingRecords;
+      projection = ProjectSewingAmplitudeRecords[
+        sewingRecords,
+        fullPolarization,
+        identicalInfo,
+        localCFBlock,
+        SewingDebug -> debug
+      ];
+      If[projection === $Failed, Return[$Failed]];
+      If[! TrueQ[projection["CompleteQ"]],
+        Message[
+          ConstructProjectedSewingRelativeChiralBasis::complete,
+          fullPolarization,
+          projection["CFRank"],
+          projection["SewingRank"],
+          projection["JoinedRank"]
+        ];
+        Return[$Failed]
+      ];
+      colorData = getColorData[identicalInfo];
+      If[! AssociationQ[colorData],
+        Message[ConstructProjectedSewingRelativeChiralBasis::su3, identicalInfo, OptionValue[su3ShapeList]];
+        Return[$Failed]
+      ];
+      hasSU3 = TrueQ[colorData["HasSU3"]];
+      colorBasis = colorData["SU3Basis"];
+      su3IndDict = colorData["SU3IndexDictionary"];
+      colorOperatorDict = colorData["SU3OperatorDictionary"];
+      If[Length[colorBasis] == 0, Continue[]];
+      directProductItems = SewingDirectProductBasisItems[
+        projection["Records"],
+        colorBasis,
+        su3IndDict,
+        hasSU3
+      ];
+      If[Length[identicalInfo] == 0,
+        independentPositions = Range[Length[directProductItems]];
+        totalIdenticalOperator = IdentityMatrix[Length[directProductItems]];
+        totalJDiagnostics = <|"PtotalBlockDiagonalByJ" -> True, "TotalYoungOperatorBlockDiagonalByJ" -> True|>,
+        totalOperator[id_] := Module[{lorentzOps, colorOps, colorIdentity},
+          lorentzOps = Association[projection["LorentzOperatorDictionary"][id]];
+          colorOps = If[hasSU3 && KeyExistsQ[colorOperatorDict, id], Association[colorOperatorDict[id]], <||>];
+          colorIdentity = IdentityMatrix[Length[colorBasis]];
+          Association @ Table[
+            opKey -> KroneckerProduct[lorentzOps[opKey], Lookup[colorOps, opKey, colorIdentity]],
+            {opKey, Keys[lorentzOps]}
+          ]
+        ];
+        totalIdenticalOperator = Dot @@ Table[
+          projection["IdenticalPolynomialDictionary"][id] /. totalOperator[id],
+          {id, identicalInfo}
+        ];
+        independentPositions = FindIndependentBasisPos[totalIdenticalOperator];
+        totalJDiagnostics = <|
+          "PtotalBlockDiagonalByJ" -> AllTrue[
+            Flatten[Values /@ (totalOperator /@ identicalInfo), 1],
+            SewingMatrixBlockDiagonalByJQ[#, directProductItems] &
+          ],
+          "TotalYoungOperatorBlockDiagonalByJ" -> SewingMatrixBlockDiagonalByJQ[
+            totalIdenticalOperator,
+            directProductItems
+          ]
+        |>
+      ];
+      projectedItems = directProductItems[[independentPositions]];
+      sectorOutput = Join[
+        projection,
+        <|
+          "Block" -> block,
+          "RightPolarization" -> rightPolarization,
+          "ColorData" -> colorData,
+          "DirectProductItemsBeforeProjection" -> directProductItems,
+          "ProjectedItems" -> projectedItems,
+          "TotalYoungOperator" -> totalIdenticalOperator,
+          "DirectProductIndependentPositions" -> independentPositions,
+          "TotalJBlockDiagnostics" -> totalJDiagnostics
+        |>
+      ];
+      Sow[sectorOutput],
+      {block, physicalBlocks}
+    ]
+  ][[2]];
+  sectorResults = If[Length[sectorResults] == 0, {}, First[sectorResults]];
+  allProjectedItems = Flatten[Lookup[sectorResults, "ProjectedItems", {}], 1];
+  groupedBasis = SewingGroupProjectedItemsByChiralOrder[
+    allProjectedItems,
+    OptionValue[ReplaceQInFinalSymbolForm],
+    OptionValue[QReplacement]
+  ];
+  expectedDirectCount = Total[Length /@ Lookup[sectorResults, "ProjectedItems", {}]];
+  outputCount = Total[Length /@ Values[groupedBasis]];
+  If[expectedDirectCount =!= outputCount,
+    Message[
+      ConstructProjectedSewingRelativeChiralBasis::count,
+      ToString[<|"SelectedItems" -> expectedDirectCount, "OutputItems" -> outputCount|>, InputForm]
+    ];
+    Return[$Failed]
+  ];
+  If[TrueQ[OptionValue[ReturnProjectionData]],
+    <|
+      "BasisByRelativeChiralOrder" -> groupedBasis,
+      "SectorResults" -> sectorResults,
+      "Spins" -> spins,
+      "Mass" -> fullMass,
+      "IdenticalTypeList" -> identicalTypeList,
+      "CandidateBlocks" -> candidateBlocks,
+      "PhysicalBlocks" -> physicalBlocks,
+      "SU3ShapeList" -> OptionValue[su3ShapeList],
+      "SU3IndexDictionaries" -> DeleteDuplicates[Lookup[Lookup[sectorResults, "ColorData", {}], "SU3IndexDictionary", <||>]]
+    |>,
+    groupedBasis
+  ]
 ];
