@@ -9,8 +9,8 @@ ROW 1
   XPower: 0
   AmpL: \left\langle 2J\right\rangle\left[8J\right]
   AmpR: \left\langle 3J\right\rangle\left[46\right]\left[4J\right]
-  TotalAmp: -1\left\langle 23\right\rangle\left[46\right]\left[48\right]
-  ReducedAmp: -1\left\langle 23\right\rangle\left[14\right]\left[34\right]
+  TotalAmp: \left\langle 23\right\rangle\left[46\right]\left[48\right]
+  ReducedAmp: \left\langle 23\right\rangle\left[14\right]\left[34\right]
 ROW 2
   AmpDim: 3
   J: 1
@@ -18,9 +18,18 @@ ROW 2
   XPower: 0
   AmpL: \left\langle 1J\right\rangle\left[7J\right]
   AmpR: \left\langle 3J\right\rangle\left[46\right]\left[4J\right]
-  TotalAmp: -1\left\langle 13\right\rangle\left[46\right]\left[47\right]
-  ReducedAmp: -1\left\langle 13\right\rangle\left[24\right]\left[34\right]
+  TotalAmp: \left\langle 13\right\rangle\left[46\right]\left[47\right]
+  ReducedAmp: \left\langle 13\right\rangle\left[24\right]\left[34\right]
 ROW 3
+  AmpDim: 4
+  J: 2
+  Kind: open
+  XPower: 0
+  AmpL: \left\langle 2J\right\rangle\left[2J\right]\left[7J\right]\left[8J\right]
+  AmpR: \left\langle 3J\right\rangle\left[4J\right]\left[4J\right]\left[6J\right]
+  TotalAmp: \left\langle 23\right\rangle\left[26\right]\left[47\right]\left[48\right]
+  ReducedAmp: -1\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[24\right]-1\left\langle 34\right\rangle\left[14\right]\left[24\right]\left[34\right]
+ROW 4
   AmpDim: 4
   J: 2
   Kind: open
@@ -29,15 +38,6 @@ ROW 3
   AmpR: \left\langle 3J\right\rangle\left[4J\right]\left[4J\right]\left[6J\right]
   TotalAmp: \left\langle 23\right\rangle\left[24\right]\left[47\right]\left[68\right]
   ReducedAmp: -1\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[24\right]
-ROW 4
-  AmpDim: 4
-  J: 2
-  Kind: open
-  XPower: 0
-  AmpL: \left\langle 2J\right\rangle\left[2J\right]\left[7J\right]\left[8J\right]
-  AmpR: \left\langle 3J\right\rangle\left[4J\right]\left[4J\right]\left[6J\right]
-  TotalAmp: \left\langle 23\right\rangle\left[24\right]\left[48\right]\left[67\right]
-  ReducedAmp: -1\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[24\right]-1\left\langle 34\right\rangle\left[14\right]\left[24\right]\left[34\right]
 
 RELATIVE_ORDER 3 COUNT 6
 ROW 1
@@ -47,8 +47,8 @@ ROW 1
   XPower: 1
   AmpL: -1\left\langle 12\right\rangle-1\left[78\right]
   AmpR: \left\langle 23\right\rangle\left[24\right]\left[46\right]
-  TotalAmp: -1\left\langle 12\right\rangle\left\langle 23\right\rangle\left[24\right]\left[46\right]
-  ReducedAmp: -1\left\langle 13\right\rangle\left\langle 23\right\rangle\left[34\right]\left[34\right]
+  TotalAmp: \left\langle 12\right\rangle\left\langle 23\right\rangle\left[46\right]\left[47\right]+\left\langle 23\right\rangle\left[46\right]\left[47\right]\left[78\right]
+  ReducedAmp: -1\left\langle 34\right\rangle\left[14\right]\left[24\right]\left[34\right]-1\left\langle 13\right\rangle\left\langle 23\right\rangle\left[34\right]\left[34\right]
 ROW 2
   AmpDim: 5
   J: 2
@@ -56,8 +56,8 @@ ROW 2
   XPower: 0
   AmpL: \left\langle 2J\right\rangle\left\langle 2J\right\rangle\left[2J\right]\left[8J\right]
   AmpR: \left\langle 3J\right\rangle\left\langle 4J\right\rangle\left[46\right]\left[4J\right]\left[4J\right]
-  TotalAmp: -1\left\langle 23\right\rangle\left\langle 24\right\rangle\left[24\right]\left[46\right]\left[48\right]
-  ReducedAmp: -1\left\langle 23\right\rangle\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[34\right]
+  TotalAmp: \left\langle 23\right\rangle\left\langle 24\right\rangle\left[24\right]\left[46\right]\left[48\right]
+  ReducedAmp: \left\langle 23\right\rangle\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[34\right]
 ROW 3
   AmpDim: 5
   J: 2
@@ -65,8 +65,8 @@ ROW 3
   XPower: 0
   AmpL: \left\langle 1J\right\rangle\left\langle 2J\right\rangle\left[2J\right]\left[7J\right]
   AmpR: \left\langle 3J\right\rangle\left\langle 4J\right\rangle\left[46\right]\left[4J\right]\left[4J\right]
-  TotalAmp: -1\left\langle 13\right\rangle\left\langle 24\right\rangle\left[24\right]\left[46\right]\left[47\right]
-  ReducedAmp: -1\left\langle 13\right\rangle\left\langle 24\right\rangle\left[24\right]\left[24\right]\left[34\right]
+  TotalAmp: \left\langle 13\right\rangle\left\langle 24\right\rangle\left[24\right]\left[46\right]\left[47\right]
+  ReducedAmp: \left\langle 13\right\rangle\left\langle 24\right\rangle\left[24\right]\left[24\right]\left[34\right]
 ROW 4
   AmpDim: 5
   J: 2
@@ -74,9 +74,18 @@ ROW 4
   XPower: 0
   AmpL: \left\langle 1J\right\rangle\left\langle 2J\right\rangle\left[2J\right]\left[7J\right]
   AmpR: \left\langle 3J\right\rangle\left\langle 4J\right\rangle\left[46\right]\left[4J\right]\left[4J\right]
-  TotalAmp: -1\left\langle 14\right\rangle\left\langle 23\right\rangle\left[24\right]\left[46\right]\left[47\right]
-  ReducedAmp: -1\left\langle 13\right\rangle\left\langle 24\right\rangle\left[24\right]\left[24\right]\left[34\right]-1\left\langle 13\right\rangle\left\langle 34\right\rangle\left[24\right]\left[34\right]\left[34\right]
+  TotalAmp: \left\langle 14\right\rangle\left\langle 23\right\rangle\left[24\right]\left[46\right]\left[47\right]
+  ReducedAmp: \left\langle 13\right\rangle\left\langle 24\right\rangle\left[24\right]\left[24\right]\left[34\right]+\left\langle 13\right\rangle\left\langle 34\right\rangle\left[24\right]\left[34\right]\left[34\right]
 ROW 5
+  AmpDim: 6
+  J: 3
+  Kind: open
+  XPower: 0
+  AmpL: \left\langle 2J\right\rangle\left\langle 2J\right\rangle\left[2J\right]\left[2J\right]\left[7J\right]\left[8J\right]
+  AmpR: \left\langle 3J\right\rangle\left\langle 4J\right\rangle\left[4J\right]\left[4J\right]\left[4J\right]\left[6J\right]
+  TotalAmp: \left\langle 23\right\rangle\left\langle 24\right\rangle\left[24\right]\left[26\right]\left[47\right]\left[48\right]
+  ReducedAmp: -1\left\langle 24\right\rangle\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[24\right]\left[24\right]-1\left\langle 24\right\rangle\left\langle 34\right\rangle\left[14\right]\left[24\right]\left[24\right]\left[34\right]
+ROW 6
   AmpDim: 6
   J: 3
   Kind: open
@@ -85,15 +94,6 @@ ROW 5
   AmpR: \left\langle 3J\right\rangle\left\langle 4J\right\rangle\left[4J\right]\left[4J\right]\left[4J\right]\left[6J\right]
   TotalAmp: \left\langle 23\right\rangle\left\langle 24\right\rangle\left[24\right]\left[24\right]\left[47\right]\left[68\right]
   ReducedAmp: -1\left\langle 24\right\rangle\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[24\right]\left[24\right]
-ROW 6
-  AmpDim: 6
-  J: 3
-  Kind: open
-  XPower: 0
-  AmpL: \left\langle 2J\right\rangle\left\langle 2J\right\rangle\left[2J\right]\left[2J\right]\left[7J\right]\left[8J\right]
-  AmpR: \left\langle 3J\right\rangle\left\langle 4J\right\rangle\left[4J\right]\left[4J\right]\left[4J\right]\left[6J\right]
-  TotalAmp: \left\langle 23\right\rangle\left\langle 24\right\rangle\left[24\right]\left[24\right]\left[48\right]\left[67\right]
-  ReducedAmp: -1\left\langle 24\right\rangle\left\langle 24\right\rangle\left[14\right]\left[24\right]\left[24\right]\left[24\right]-1\left\langle 24\right\rangle\left\langle 34\right\rangle\left[14\right]\left[24\right]\left[24\right]\left[34\right]
 
 RELATIVE_ORDER 4 COUNT 3
 ROW 1
@@ -103,8 +103,8 @@ ROW 1
   XPower: 0
   AmpL: \left\langle 2J\right\rangle\left[8J\right]
   AmpR: \left\langle 34\right\rangle\left\langle 3J\right\rangle\left[34\right]\left[46\right]\left[4J\right]
-  TotalAmp: -1\left\langle 23\right\rangle\left\langle 34\right\rangle\left[34\right]\left[46\right]\left[48\right]
-  ReducedAmp: -1\left\langle 23\right\rangle\left\langle 34\right\rangle\left[14\right]\left[34\right]\left[34\right]
+  TotalAmp: \left\langle 23\right\rangle\left\langle 34\right\rangle\left[34\right]\left[46\right]\left[48\right]
+  ReducedAmp: \left\langle 23\right\rangle\left\langle 34\right\rangle\left[14\right]\left[34\right]\left[34\right]
 ROW 2
   AmpDim: 6
   J: 2

@@ -927,7 +927,6 @@ ConstructLeft3PointOpenBasis[spinJ_Integer?NonNegative, OptionsPattern[]] := Mod
   qPower = (ab[Q, J] sb[Q, J])^qExponent;
   closed = SewingClosedPairMonomials[closedSlots, pointCount];
   open = SewingOpenPairMonomials[openSlots, pointCount];
-  If[qExponent == 0, open = Select[open, SewingBalancedOpenPairQ]];
   records = Flatten@Table[
     With[{sym = Expand[o["SymbolicAmp"] c["SymbolicAmp"] qPower]},
     <|
@@ -1290,17 +1289,23 @@ SewingAutoJSearchLimit[leftSpin_, ampDim_Integer, rightSpins_List] := Module[
 ];
 
 SewingDefaultRightMass[np_Integer?Positive] := If[np >= 3, {3}, {}];
+SewingMassLabelValue[i_Integer?Positive] :=
+  "\!\(\*SubscriptBox[\(m\), \(" <> ToString[i] <> "\)]\)";
+SewingMassVectorFromPositions[positions_List, np_Integer?Positive] :=
+  Table[If[MemberQ[positions, i], SewingMassLabelValue[i], 0], {i, np}];
 
 SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List] := Module[
-  {np = 2 + Length[rightSpins], rightMass, rightPositionQ, rightVectorQ, leftVector},
+  {np = 2 + Length[rightSpins], rightMass, rightPositionQ, rightVectorQ, leftVector, rightVector},
   rightMass = Replace[rightMassIn, Automatic -> SewingDefaultRightMass[np]];
   rightPositionQ = ListQ[rightMass] && And @@ ((IntegerQ[#] && 3 <= # <= np) & /@ rightMass);
   rightVectorQ = ListQ[rightMass] && Length[rightMass] == Length[rightSpins] && ! rightPositionQ;
   Which[
     rightPositionQ,
+      leftVector = MassOption[leftMassIn, 2];
+      rightVector = SewingMassVectorFromPositions[rightMass, np];
       <|
-        "RightConstructMass" -> rightMass,
-        "FullMass" -> Join[leftMassIn, rightMass],
+        "RightConstructMass" -> rightVector,
+        "FullMass" -> Join[leftVector, Drop[rightVector, 2]],
         "PhysicalRightMass" -> rightMass
       |>,
     rightVectorQ,
@@ -1428,7 +1433,7 @@ ConstructGeneralSewingAmplitudeRecords[
               FilterRules[{opts}, Options[ConstructRightProjectedJResidualRecords]],
               {
                 CodeDim -> SewingCodeDimFromAmpDim[rightAmpDim, npRight],
-                EqualAuxiliarySpin -> True
+                EqualAuxiliarySpin -> OptionValue[EqualAuxiliarySpin]
               }
             ]
           ];
