@@ -24,10 +24,12 @@ ClearAll[
   SewingRightJCountsMatchQ, SewingBracketDegree, SewingAmpDimMatchQ,
   SewingLeftDegreeData, SewingCodeDimFromAmpDim, SewingDefaultJMax, SewingDefaultRightMass,
   SewingMassOptionData, SewingCoeffMatrixDataUnion, SewingValidMetaQ,
-  SewingAmpMetaTerms, SewingPhysicalAmpTermQ, SewingRecordPolarizationMatchQ, SewingIndependentBlockFromRecords,
+  SewingAmpMetaTerms, SewingPhysicalAmpTermQ, SewingRecordPhysicalPolarizations,
+  SewingAttachPhysicalPolarizationData, SewingRecordPolarizationMatchQ, SewingIndependentBlockFromRecords,
   SewingProjectReducedAmpToBasis,
   SewingMasslessSelfColumnFreeQ, SewingLeftRecordCheck, SewingRightRecordCheck, SewingSewnRecordCheck,
   SewingCheckFailureQ, SewingCheckFailureMessage,
+  SewingLeftRecordProvider,
   SewingProjectAuxiliaryLabels, SewingNormalizeJTarget,
   SewingSortData, SewingSortDataQ,
   SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder,
@@ -135,6 +137,8 @@ ConstructProjectedSewingRelativeChiralBasis::usage =
   "ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, identicalParam, opts] constructs the projected independent sewing basis for an equal-spin heavy pair and right-side particles. It enumerates the physically inequivalent full polarization sectors using GenerateNeedCFBlocks and FilterCFBlocksByIdentical, verifies each nonzero sector against the matching ConstructIndepCFBlock span, applies right-side identical-particle Young projection, and optionally attaches SU(3) color structures through a Lorentz/color direct product. Independent representatives after Lorentz/color projection are selected with FindIndependentBasisPos. The default output is an association `relativeChiralOrder -> symbolicBasisList`; without SU(3) the entries are symbolic Lorentz forms, while with su3ShapeList the entries are associations containing `LorentzSymbolForm`, `SU3Basis`, `SU3IndexDictionary`, and `DirectProduct`. ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, identicalParam, opts] specifies right-side massive labels explicitly. Main options include RightMass, LeftMass, su3ShapeList, QReplacement, ReplaceQInFinalSymbolForm, ReturnProjectionData, and SewingDebug. With ReturnProjectionData -> True the return value is an association with `BasisByRelativeChiralOrder`, `SectorResults`, `Spins`, `Mass`, `IdenticalTypeList`, `PhysicalBlocks`, `SU3ShapeList`, and `SU3IndexDictionaries`.";
 SewingPerformanceTrace::usage =
   "SewingPerformanceTrace is an option for projected sewing constructors. The default False disables timing data. Set SewingPerformanceTrace -> True together with ReturnProjectionData -> True to include per-stage timing and cache hit/miss counters in the returned association.";
+SewingLeftRecordProvider::usage =
+  "SewingLeftRecordProvider is an internal option for ConstructGeneralSewingAmplitudeRecords that accepts a J-indexed record provider. The default Automatic calls ConstructLeft3PointOpenBasis; projected constructors use this hook to reuse left records across projected sectors.";
 
 SewingApplyLeftQReplacement::badq =
   "Unsupported QReplacement specification `1`. Use a symbol, an integer label, or a signed integer list such as {1,2} or {1,-2}.";
@@ -1432,6 +1436,7 @@ Options[ConstructGeneralSewingAmplitudeRecords] = Join[
     FilterPhysicalSector -> True,
     FilterByAmpDim -> True,
     DeduplicateByReducedAmp -> False,
+    SewingLeftRecordProvider -> Automatic,
     SewingDebug -> False,
     SewingPerformanceTrace -> False
   },
@@ -1463,9 +1468,12 @@ ConstructGeneralSewingAmplitudeRecords[
   {
     npFull, npRight, rightMassData, rightMass, jRangeOpt, jMaxOpt, jRange, autoJQ,
     autoJLimit, noRightWindow, noRightCount,
-    leftRecords, rightRawRecordsFor, decorateRightRawRecords, rightRecordsFor, rightRecords, rows,
-    reducedOpts, key, qSpec, contractionMode,
-    leftChecks, failedChecks, cfPolarizations, debug, perfRecorder, buildLeftRecordsForJ, jLeftRecords, hasRightRecordsQ
+    leftRecords,
+    rightRawRecordsFor, decorateRightRawRecords, rightProjectedCache = <||>,
+    rightProjectedRecordsFor, rightRecordsFor, rightRecords, rows,
+    reducedOpts, reducedAmpCache = <||>, reduceSewnAmp, key, qSpec, contractionMode,
+    leftChecks, failedChecks, cfPolarizations, debug, perfRecorder, leftRecordProvider, buildLeftRecordsForJ,
+    jLeftRecords, hasRightRecordsQ
   },
   debug = TrueQ[OptionValue[SewingDebug]];
   perfRecorder = OptionValue[SewingPerformanceTrace];
@@ -1487,6 +1495,7 @@ ConstructGeneralSewingAmplitudeRecords[
   ];
   qSpec = OptionValue[QReplacement];
   contractionMode = OptionValue[SewingContractionMode];
+  leftRecordProvider = OptionValue[SewingLeftRecordProvider];
   If[! MemberQ[{"Split", "Sum"}, contractionMode],
     Message[ConstructGeneralSewingAmplitudeRecords::mode, contractionMode];
     Return[$Failed]
@@ -1552,52 +1561,101 @@ ConstructGeneralSewingAmplitudeRecords[
     ];
     If[raw === $Failed || ! ListQ[raw], {}, decorateRightRawRecords[raw]]
   ];
+  rightProjectedRecordsFor[
+    rightAmpDim_Integer?NonNegative,
+    angleJ_Integer?NonNegative,
+    squareJ_Integer?NonNegative,
+    jMeta_
+  ] := Module[{cacheKey, rr},
+    cacheKey = {rightAmpDim, angleJ, squareJ};
+    If[KeyExistsQ[rightProjectedCache, cacheKey],
+      SewingPerformanceRecord[
+        perfRecorder,
+        "Cache.GeneralRightProjectedRecords",
+        0.,
+        <|
+          "Cache" -> "Hit",
+          "J" -> jMeta,
+          "RightAmpDim" -> rightAmpDim,
+          "AngleJ" -> angleJ,
+          "SquareJ" -> squareJ
+        |>
+      ];
+      Return[rightProjectedCache[cacheKey]]
+    ];
+    SewingPerformanceRecord[
+      perfRecorder,
+      "Cache.GeneralRightProjectedRecords",
+      0.,
+      <|
+        "Cache" -> "Miss",
+        "J" -> jMeta,
+        "RightAmpDim" -> rightAmpDim,
+        "AngleJ" -> angleJ,
+        "SquareJ" -> squareJ
+      |>
+    ];
+    If[ValueQ[rightRawRecordsFor[rightAmpDim]],
+      SewingPerformanceRecord[
+        perfRecorder,
+        "Cache.GeneralRightAuxiliaryRawRecords",
+        0.,
+        <|"Cache" -> "Hit", "RightAmpDim" -> rightAmpDim|>
+      ]
+    ];
+    rr = Append[#, "RightAmpDim" -> rightAmpDim] & /@
+      SewingPerformanceTimed[
+        perfRecorder,
+        "General.RightProjectedRecords",
+        ConstructRightProjectedJResidualRecordsFromRaw[
+          <|"AngleJ" -> angleJ, "SquareJ" -> squareJ|>,
+          rightRawRecordsFor[rightAmpDim],
+          ReturnRejected -> OptionValue[ReturnRejected],
+          RejectZeroProjection -> OptionValue[RejectZeroProjection],
+          SewingDebug -> debug
+        ],
+        <|
+          "J" -> jMeta,
+          "RightAmpDim" -> rightAmpDim,
+          "AngleJ" -> angleJ,
+          "SquareJ" -> squareJ
+        |>
+      ];
+    rightProjectedCache[cacheKey] = rr
+  ];
   rightRecordsFor[left_Association] := rightRecordsFor[
     left["J"],
     ToString[left["AmpL"], InputForm],
     ampDim - SewingLeftDegreeData[left["AmpL"]]["Total"] + SewingJCounts[left["AmpL"]]["TotalJ"]
   ] = Module[
-    {leftJCounts = SewingJCounts[left["AmpL"]], rightAmpDim},
+    {leftJCounts = SewingJCounts[left["AmpL"]], rightAmpDim, rr},
     rightAmpDim = ampDim - SewingLeftDegreeData[left["AmpL"]]["Total"] + leftJCounts["TotalJ"];
     If[rightAmpDim < 0,
       {},
-      Module[{rr},
-        If[ValueQ[rightRawRecordsFor[rightAmpDim]],
-          SewingPerformanceRecord[
-            perfRecorder,
-            "Cache.GeneralRightAuxiliaryRawRecords",
-            0.,
-            <|"Cache" -> "Hit", "RightAmpDim" -> rightAmpDim|>
-          ]
-        ];
-        rr = Append[#, "RightAmpDim" -> rightAmpDim] & /@
-          SewingPerformanceTimed[
-            perfRecorder,
-            "General.RightProjectedRecords",
-            ConstructRightProjectedJResidualRecordsFromRaw[
-              <|"AngleJ" -> leftJCounts["AngleJ"], "SquareJ" -> leftJCounts["SquareJ"]|>,
-              rightRawRecordsFor[rightAmpDim],
-              ReturnRejected -> OptionValue[ReturnRejected],
-              RejectZeroProjection -> OptionValue[RejectZeroProjection],
-              SewingDebug -> debug
-            ],
-            <|"J" -> left["J"], "RightAmpDim" -> rightAmpDim|>
-          ];
-        SewingLog[debug, "General.RightRecords", <|"J" -> left["J"], "RightAmpDim" -> rightAmpDim, "Count" -> Length[rr]|>];
-        rr
-      ]
+      rr = rightProjectedRecordsFor[
+        rightAmpDim,
+        leftJCounts["AngleJ"],
+        leftJCounts["SquareJ"],
+        left["J"]
+      ];
+      SewingLog[debug, "General.RightRecords", <|"J" -> left["J"], "RightAmpDim" -> rightAmpDim, "Count" -> Length[rr]|>];
+      rr
     ]
   ];
-  buildLeftRecordsForJ[j_Integer?NonNegative] := SewingPerformanceTimed[
-    perfRecorder,
-    "General.Left3Point",
-    ConstructLeft3PointOpenBasis[
-      j,
-      MassiveSpin -> leftSpin,
-      PointCount -> npFull,
-      QReplacement -> qSpec
+  buildLeftRecordsForJ[j_Integer?NonNegative] := If[
+    leftRecordProvider === Automatic,
+    SewingPerformanceTimed[
+      perfRecorder,
+      "General.Left3Point",
+      ConstructLeft3PointOpenBasis[
+        j,
+        MassiveSpin -> leftSpin,
+        PointCount -> npFull,
+        QReplacement -> qSpec
+      ],
+      <|"J" -> j|>
     ],
-    <|"J" -> j|>
+    leftRecordProvider[j]
   ];
   hasRightRecordsQ[records_List] := AnyTrue[records, Length[rightRecordsFor[#]] > 0 &];
   If[TrueQ[autoJQ],
@@ -1639,6 +1697,30 @@ ConstructGeneralSewingAmplitudeRecords[
   reducedOpts = Sequence @@ Join[
     FilterRules[{opts}, Options[SewingReducedMasslessGeneral]],
     {PointCount -> npFull}
+  ];
+  reduceSewnAmp[amp_, left_Association, termIndex_Integer] := Module[{cacheKey},
+    cacheKey = HoldComplete @@ {amp};
+    If[KeyExistsQ[reducedAmpCache, cacheKey],
+      SewingPerformanceRecord[
+        perfRecorder,
+        "Cache.GeneralReduceSewnAmp",
+        0.,
+        <|"Cache" -> "Hit", "J" -> left["J"], "TermIndex" -> termIndex|>
+      ];
+      Return[reducedAmpCache[cacheKey]]
+    ];
+    SewingPerformanceRecord[
+      perfRecorder,
+      "Cache.GeneralReduceSewnAmp",
+      0.,
+      <|"Cache" -> "Miss", "J" -> left["J"], "TermIndex" -> termIndex|>
+    ];
+    reducedAmpCache[cacheKey] = SewingPerformanceTimed[
+      perfRecorder,
+      "General.ReduceSewnAmp",
+      SewingReducedMasslessGeneral[amp, reducedOpts],
+      <|"J" -> left["J"], "TermIndex" -> termIndex|>
+    ]
   ];
   rows = Catch[Flatten@Table[
     rightRecords = rightRecordsFor[left];
@@ -1731,12 +1813,7 @@ ConstructGeneralSewingAmplitudeRecords[
                 "WorkingAmpForm" -> total
               |>,
               "TotalAmp" -> total,
-              "ReducedAmp" -> SewingPerformanceTimed[
-                perfRecorder,
-                "General.ReduceSewnAmp",
-                SewingReducedMasslessGeneral[total, reducedOpts],
-                <|"J" -> left["J"], "TermIndex" -> termIndex|>
-              ],
+              "ReducedAmp" -> reduceSewnAmp[total, left, termIndex],
               "LeftRecord" -> left,
               "RightRecord" -> right
             |>;
@@ -1822,6 +1899,10 @@ SewingValidMetaQ[meta_, np_Integer?Positive] :=
 
 SewingAmpMetaTerms[amp_, np_Integer?Positive, masses_] :=
   DeleteDuplicates[Amp2MetaInfo[#, np, mass -> masses] & /@ Sum2List[Expand[amp]]];
+SewingRecordPhysicalPolarizations::usage =
+  "SewingRecordPhysicalPolarizations[record, np, masses] returns the full-polarization sectors compatible with a sewing record, or All for symbolic records whose physical sector is intentionally left open. It is an internal projected-sewing cache helper.";
+SewingAttachPhysicalPolarizationData::usage =
+  "SewingAttachPhysicalPolarizationData[records, np, masses] annotates sewing records with cached PhysicalPolarizations metadata so repeated identical-projection filters do not recompute Amp2MetaInfo.";
 
 SewingPhysicalAmpTermQ[
   term_,
@@ -1833,8 +1914,30 @@ SewingPhysicalAmpTermQ[
   SewingValidMetaQ[meta, np] && meta[[1]] === expectedSpins && MemberQ[cfPolarizations, meta[[2]]]
 ];
 
+SewingRecordPhysicalPolarizations[rec_Association, np_Integer?Positive, masses_] := Module[
+  {terms, expectedSpins, metas},
+  If[SewingContainsXSymbolQ[Lookup[rec, "SewingSymForm", 0]], Return[All]];
+  terms = Lookup[rec, "SewingAmpFormTerms", Sum2List[Expand[Lookup[rec, "TotalAmp", 0]]]];
+  expectedSpins = Join[{rec["LeftSpin"], rec["LeftSpin"]}, rec["RightSpins"]];
+  metas = Amp2MetaInfo[#, np, mass -> masses] & /@ terms;
+  DeleteDuplicates @ Cases[
+    metas,
+    meta_ /; SewingValidMetaQ[meta, np] && meta[[1]] === expectedSpins :> meta[[2]]
+  ]
+];
+
+SewingAttachPhysicalPolarizationData[records_List, np_Integer?Positive, masses_] :=
+  Append[#, "PhysicalPolarizations" -> SewingRecordPhysicalPolarizations[#, np, masses]] & /@ records;
+
 SewingRecordPolarizationMatchQ[rec_Association, cfPolarizations_List, np_Integer?Positive, masses_] := Module[
-  {terms = Sum2List[Expand[rec["TotalAmp"]]], expectedSpins},
+  {physicalPolarizations, terms = Sum2List[Expand[rec["TotalAmp"]]], expectedSpins},
+  If[KeyExistsQ[rec, "PhysicalPolarizations"],
+    physicalPolarizations = rec["PhysicalPolarizations"];
+    Return[
+      physicalPolarizations === All ||
+        Length[Intersection[physicalPolarizations, cfPolarizations]] > 0
+    ]
+  ];
   If[SewingContainsXSymbolQ[Lookup[rec, "SewingSymForm", 0]], Return[True]];
   expectedSpins = Join[{rec["LeftSpin"], rec["LeftSpin"]}, rec["RightSpins"]];
   AnyTrue[terms, SewingPhysicalAmpTermQ[#, np, masses, expectedSpins, cfPolarizations] &]
@@ -2504,13 +2607,13 @@ ConstructProjectedSewingRelativeChiralBasis[
   {
     debug, traceEnabled, traceEvents = {}, traceRecord, traceSummary, pointCount, spins, codeDim, leftMass, rightMassData, fullMass,
     invalidIdenticals, identicalTypeList, candidateBlocks, physicalBlocks,
-    recordsByRightPolarization = <||>, colorCache = <||>, sectorResults,
-    projectedItemGroups, allProjectedItems, groupedBasis, getRecordsForRightPolarization,
+    recordsByRightPolarization = <||>, leftRecordsCache = <||>, colorCache = <||>, sectorResults,
+    projectedItemGroups, allProjectedItems, groupedBasis, getLeftRecordsForJ, getRecordsForRightPolarization,
     getColorData, fullPolarization, rightPolarization, localCFBlock,
     identicalInfo, sewingRecords, projection, colorData, totalOperator,
     directProductItems, projectedItems, independentPositions, colorOperatorDict,
     colorBasis, hasSU3, su3IndDict, totalIdenticalOperator, totalJDiagnostics,
-    sectorOutput, expectedDirectCount, outputCount
+    sectorOutput, expectedDirectCount, outputCount, qSpec
   },
   debug = TrueQ[OptionValue[SewingDebug]];
   traceEnabled = TrueQ[OptionValue[SewingPerformanceTrace]];
@@ -2537,6 +2640,7 @@ ConstructProjectedSewingRelativeChiralBasis[
   spins = Join[{leftSpin, leftSpin}, rightSpins];
   codeDim = SewingCodeDimFromAmpDim[ampDim, pointCount];
   leftMass = OptionValue[LeftMass];
+  qSpec = OptionValue[QReplacement];
   rightMassData = SewingMassOptionData[leftMass, OptionValue[RightMass], rightSpins];
   fullMass = rightMassData["FullMass"];
   invalidIdenticals = Select[identicalParam, ! FreeQ[#, 1 | 2] &];
@@ -2562,6 +2666,35 @@ ConstructProjectedSewingRelativeChiralBasis[
     "Projected.Blocks",
     <|"CandidateBlocks" -> Length[candidateBlocks], "PhysicalBlocks" -> Length[physicalBlocks]|>
   ];
+  getLeftRecordsForJ[j_Integer?NonNegative] := Module[{cacheKey},
+    cacheKey = {j, leftSpin, pointCount, qSpec};
+    If[KeyExistsQ[leftRecordsCache, cacheKey],
+      SewingPerformanceRecord[
+        traceRecord,
+        "Cache.GeneralLeft3Point",
+        0.,
+        <|"Cache" -> "Hit", "J" -> j, "Scope" -> "Projected"|>
+      ];
+      Return[leftRecordsCache[cacheKey]]
+    ];
+    SewingPerformanceRecord[
+      traceRecord,
+      "Cache.GeneralLeft3Point",
+      0.,
+      <|"Cache" -> "Miss", "J" -> j, "Scope" -> "Projected"|>
+    ];
+    leftRecordsCache[cacheKey] = SewingPerformanceTimed[
+      traceRecord,
+      "General.Left3Point",
+      ConstructLeft3PointOpenBasis[
+        j,
+        MassiveSpin -> leftSpin,
+        PointCount -> pointCount,
+        QReplacement -> qSpec
+      ],
+      <|"J" -> j, "Scope" -> "Projected"|>
+    ]
+  ];
   getRecordsForRightPolarization[rightPolarization_List] := If[
     KeyExistsQ[recordsByRightPolarization, rightPolarization],
     SewingPerformanceRecord[traceRecord, "Cache.RightPolarizationRecords", 0., <|"Cache" -> "Hit", "RightPolarization" -> rightPolarization|>];
@@ -2584,13 +2717,30 @@ ConstructProjectedSewingRelativeChiralBasis[
           RightMass -> rightMassData["PhysicalRightMass"],
           LeftMass -> leftMass,
           PointCount -> pointCount,
+          SewingLeftRecordProvider -> getLeftRecordsForJ,
           FilterPhysicalSector -> False,
           SewingPerformanceTrace -> traceRecord
         }
       ]
       ],
       <|"RightPolarization" -> rightPolarization|>
-    ]
+    ];
+    If[recordsByRightPolarization[rightPolarization] =!= $Failed && ListQ[recordsByRightPolarization[rightPolarization]],
+      recordsByRightPolarization[rightPolarization] = SewingPerformanceTimed[
+        traceRecord,
+        "Projected.AttachPhysicalPolarizationData",
+        SewingAttachPhysicalPolarizationData[
+          recordsByRightPolarization[rightPolarization],
+          pointCount,
+          fullMass
+        ],
+        <|
+          "RightPolarization" -> rightPolarization,
+          "RecordCount" -> Length[recordsByRightPolarization[rightPolarization]]
+        |>
+      ]
+    ];
+    recordsByRightPolarization[rightPolarization]
   ];
   getColorData[info_List] := If[
     KeyExistsQ[colorCache, info],

@@ -56,4 +56,9 @@ If[! AssociationQ[rawCacheSummary] || Lookup[rawCacheSummary, "CacheHits", 0] ==
   fail["general right auxiliary raw-record cache should record hits and misses", rawCacheSummary]
 ];
 
+leftCacheSummary = Lookup[traced["PerformanceSummary"], "Cache.GeneralLeft3Point", <||>];
+If[! AssociationQ[leftCacheSummary] || Lookup[leftCacheSummary, "CacheHits", 0] == 0 || Lookup[leftCacheSummary, "CacheMisses", 0] == 0,
+  fail["projected left 3pt cache should record hits and misses", leftCacheSummary]
+];
+
 Print["projected performance trace smoke ok"];
