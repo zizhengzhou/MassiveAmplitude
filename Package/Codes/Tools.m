@@ -2,10 +2,14 @@
 
 LogPri["Tools Loaded"];
 
+Sum2List::usage =
+  "Sum2List[expr] returns the additive terms of expr as a list. Non-sums are returned as a one-element list.";
 Sum2List[x_Plus] :=
     List @@ x;
 Sum2List[x_ : Except[Plus]] :=
     List@x;
+Prod2List::usage =
+  "Prod2List[expr] returns multiplicative factors of expr as a flat list, expanding positive integer powers into repeated factors.";
 Prod2List[x_] :=
     Flatten[{x} /. {Power[y_, z_Integer] /; z > 0 :> ConstantArray[y, z], Times -> List}];
 
@@ -25,14 +29,18 @@ CountHead[head_] :=
 
 (*CountHead[head_] :=
     Module[ {list = {#} /. Times :> List // Flatten},
-        Count[list, 
+        Count[list,
           head[a_, b_]] + (Cases[list, head[a_, b_]^n_] /. head[_, _]^n_ :> n //
         Total)
     ] &;*)
+FindIndependentBasisPos::usage =
+  "FindIndependentBasisPos[matrix] returns row positions forming an independent row subset, computed from row-reducing the transposed matrix.";
 FindIndependentBasisPos[{}] := {};
 FindIndependentBasisPos[coordinateMatrix_?MatrixQ] := Flatten[FirstPosition[#, Except[0, _?NumericQ], {}]& /@
     RowReduce@Transpose@coordinateMatrix];
 
+FindCoordinate::usage =
+  "FindCoordinate[vector, basis] returns the coordinate vector of vector in basis and throws when no exact reconstruction is found.";
 FindCoordinate[vector_, stBasis_?ListQ, coefficientQ_ : NumberQ] := Module[{
   coordinate = ConstantArray[0, Length@stBasis],
   factorizeCoeff = {
@@ -131,4 +139,4 @@ SyncDataTask[syncedDict_, taskFun_, distributedData_, OptionsPattern[]] :=
           ], {k, kernels}, DistributedContexts -> OptionValue@context]
       ]
     ]
- 
+

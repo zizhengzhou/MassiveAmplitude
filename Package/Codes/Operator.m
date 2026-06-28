@@ -117,32 +117,6 @@ FindPsiChain[amp_, np_Integer, OptionsPattern[]] := Module[
           ]
         ]
       ];
-  (*Get head*)
-  (*  FindNextHeadTarget[] := Block[{externalIndex},*)
-  (*    While[True,*)
-  (*      externalIndex = FirstPosition[extSbStack[[1]], Except[0, _Integer], {-1}, 1][[1]];*)
-  (*      If[externalIndex != -1,*)
-  (*        extSbStack[[1]][[externalIndex]]--;*)
-  (*        targetBraType = sb;*)
-  (*        targetParticle = 2 * np + 1 - externalIndex;*)
-  (*        ,*)
-  (*        externalIndex = FirstPosition[extSbStack[[2]], Except[0, _Integer], {-1}, 1][[1]];*)
-  (*        If[externalIndex != -1,*)
-  (*          extSbStack[[2]][[externalIndex]]--;*)
-  (*          targetBraType = ab;*)
-  (*          targetParticle = externalIndex;*)
-  (*          ,*)
-  (*          targetBraType = targetParticle = Null;*)
-  (*          targetBraType2 = targetParticle2 = Null;*)
-  (*          Return[False];*)
-  (*        ];*)
-  (*      ];*)
-  (*      If[ExistNextTargetQ[targetBraType, targetParticle],*)
-  (*        chains ~ AppendTo ~ {targetBraType};*)
-  (*        Return[True];*)
-  (*      ]*)
-  (*    ];*)
-  (*  ];*)
 
   (*test whether exists next target bra, no side effect*)
   ExistNextTargetQ[targetBraTypeInner_, targetParticleInner_] := Block[{targetInner, rule, factorList},
@@ -279,7 +253,7 @@ TranslatePhi[n_Integer][chain_List] := TranslateAppendField[{"\[Phi]", n}, n, ch
 
 
 ClearAll[TranslatePsi];
-TranslatePsi[n_Integer][chain_List]:= 
+TranslatePsi[n_Integer][chain_List]:=
 chain/. {{ab,n,o___}:>{{"\[Psi]",n,ab},o},{sb,n,o___}:>{{"\[Psi]",n,sb},o},{o___,n,ab}:>{o,{"\[Psi]",n,ab}},{o___,n,sb}:>{o,{"\[Psi]",n,sb}}
 };
 
@@ -322,7 +296,7 @@ ChainToCircleFlip[Lorgen_][chain_List,n_Integer] := Module[{test, extra, others,
   &&chain[[2]]===chain[[-2]]&&chain[[2]]==n
   &&Length@Complement[{ab,sb},{chain[[1]],chain[[-1]]}]==0;
   If[!test, Return[{chain, {}, None}]];
-  i = Lorgen[]; 
+  i = Lorgen[];
   flag = Switch[chain[[-1]], ab, "\[Sigma]", sb, "\[Sigma]Bar", _, Print["error ChainToCircle: mismatched chain head", chain[[1]]]; Abort[]];
   extra = {flag, i};
   others = chain[[3 ;; -3]];
@@ -340,11 +314,11 @@ ChainGluedSame[Lorgen_][chainA_List, chainB_List, n_] := Module[{chainA2, chainB
    aL = chainA[[;; 2]];
    aR = chainA[[{-1, -2}]];
    bL = chainB[[;; 2]];
-   bR = chainB[[{-1, -2}]];  
+   bR = chainB[[{-1, -2}]];
    dealFun["aL==bL"] := Block[{},
      gl = aL[[1]];
      chainA2 = ReversePsiChain@chainA[[3 ;;]];
-     chainB2 = chainB[[3 ;;]];  
+     chainB2 = chainB[[3 ;;]];
      ];
    dealFun["aL==bR"] := Block[{},
      gl = aL[[1]];
@@ -357,7 +331,7 @@ ChainGluedSame[Lorgen_][chainA_List, chainB_List, n_] := Module[{chainA2, chainB
      chainB2 = chainB[[3 ;;]];
      ];
    dealFun["aR==bR"] := Block[{},
-     gl = aR[[1]]; 
+     gl = aR[[1]];
      chainA2 = chainA[[;; -3]];
      chainB2 = ReversePsiChain@chainB[[;; -3]];
      ];
@@ -375,13 +349,13 @@ ChainGluedSame[Lorgen_][chainA_List, chainB_List, n_] := Module[{chainA2, chainB
    chainB2 = Switch[Length@chainB2, 0, {}, 1, {chainB2[[1]]}, _, chainB2];
    Return@{{Sequence @@ chainA2, extra, Sequence @@ chainB2}, {i, j}, flag}
    ];
-   
+
 ClearAll@ChainGluedFlip;
 ChainGluedFlip[Lorgen_][chainA_List, chainB_List, n_] := Module[{chainA2, chainB2,flag,CheckConnectAble, i,  aL, aR, bL, bR, gl, dealFun, extra},
    aL = chainA[[;; 2]];
    aR = chainA[[{-1, -2}]];
    bL = chainB[[;; 2]];
-   bR = chainB[[{-1, -2}]];  
+   bR = chainB[[{-1, -2}]];
    CheckConnectAble[{lH_,ln_},{rH_,rn_}]:=ln==n&&rn==n&&Length@Complement[{ab,sb},{lH,rH}]==0;
    dealFun["aL&bL"] := Block[{},
      gl = {aL[[1]],bL[[1]]};
@@ -463,7 +437,7 @@ TranslateAppendField[appendedFieldObj,n,Join[{changedChain},otherChains]]
 
 ClearAll[TranslateGravitino];
 TranslateGravitino[Lorgen_, n_Integer][chains_List] := Module[{
-  isLongMode, relatedChains, circleTest, otherChains, remainChains, chainsForConnect, fieldType, 
+  isLongMode, relatedChains, circleTest, otherChains, remainChains, chainsForConnect, fieldType,
   ClassifyChains, DealWithChain, DealWithCircle, changedChain, appendedInd, reChains},
   (*classify chains*)
   relatedChains = Cases[chains, ({hL_, n, ___} /; MemberQ[{ab, sb}, hL]) | ({___, n, hR_} /; MemberQ[{ab, sb}, hR])];
@@ -486,8 +460,8 @@ TranslateGravitino[Lorgen_, n_Integer][chains_List] := Module[{
   ClassifyChains[] := Module[{ah, sh, tempAX, tempSO, tempAS},
     ah = Switch[fieldType, 2|3, ab, 1|0, sb];
     sh = Switch[fieldType, 2|3, sb, 1|0, ab];
-    Switch[fieldType, 
-    3|0, 
+    Switch[fieldType,
+    3|0,
     (*2 cases*)
     If[
 
@@ -506,9 +480,9 @@ TranslateGravitino[Lorgen_, n_Integer][chains_List] := Module[{
     2|1,
     (*3 cases*)
     (*maybe a -- s or a -- a or a--o *)
-    tempAX = SortBy[Length]@Cases[relatedChains, {ah, n, ___} | {___,n, ah} ]; 
+    tempAX = SortBy[Length]@Cases[relatedChains, {ah, n, ___} | {___,n, ah} ];
     (*only a -- s*)
-    tempAS = Cases[tempAX, {sh, n, ___} | {___,n, sh} ];  
+    tempAS = Cases[tempAX, {sh, n, ___} | {___,n, sh} ];
     (*only s -- o*)
     tempSO = ComplementMultiSet[relatedChains, tempAX];
     Which[
@@ -535,16 +509,16 @@ TranslateGravitino[Lorgen_, n_Integer][chains_List] := Module[{
   (*def two cases*)
   DealWithCircle[] := Module[{circledChain, temp1},
   (* Print["conn c", chainsForConnect]; *)
-    circledChain = chainsForConnect[[1]]; 
+    circledChain = chainsForConnect[[1]];
     temp1 = If[isLongMode, ChainToCircleFlip, ChainToCircleSame][Lorgen][circledChain, n];
-    If[Length@temp1[[2]] == 0, Print["error TranslateGravitino:connect at ", n, " for:\n", chainsForConnect]; Abort[]]; 
+    If[Length@temp1[[2]] == 0, Print["error TranslateGravitino:connect at ", n, " for:\n", chainsForConnect]; Abort[]];
     changedChain = temp1[[1]];
     appendedInd = temp1[[2]];
     ];
-  DealWithChain[] := Module[{selectedMergeChains, temp1}, 
+  DealWithChain[] := Module[{selectedMergeChains, temp1},
     (* Print["conn l", chainsForConnect]; *)
     selectedMergeChains = chainsForConnect;
-    temp1 = If[isLongMode, ChainGluedFlip ,ChainGluedSame][Lorgen][selectedMergeChains[[1]], selectedMergeChains[[2]], n]; 
+    temp1 = If[isLongMode, ChainGluedFlip ,ChainGluedSame][Lorgen][selectedMergeChains[[1]], selectedMergeChains[[2]], n];
     If[Length@temp1[[2]] == 0, Print["error TranslateGravitino:connect at ", n, " for:\n", chainsForConnect]; Abort[]];
     changedChain = temp1[[1]];
     appendedInd = temp1[[2]];
@@ -553,7 +527,7 @@ TranslateGravitino[Lorgen_, n_Integer][chains_List] := Module[{
   ClassifyChains[];
   (* Print["chainsForConnect",chainsForConnect]; *)
   (* Print["remainChains", remainChains]; *)
-  If[Length@chainsForConnect==1, DealWithCircle[], DealWithChain[] ]; 
+  If[Length@chainsForConnect==1, DealWithCircle[], DealWithChain[] ];
   If[Length@appendedInd > 2 || Length@appendedInd < 1, Print["error TranslateGravitino:ind new at", n, " for:\n", chains]; Abort[];];
   (* Print["changedChain", changedChain, appendedInd]; *)
   (* Print["remainChains", remainChains]; *)
@@ -577,14 +551,14 @@ TranslateGravitino[Lorgen_, n_Integer][chains_List] := Module[{
 
 ClearAll[AppendChainsWithGaugeIndices]
 
-(* 
+(*
   AppendChainsWithGaugeIndices:
   Appends gauge symmetry indices to relevant elements within chains based on a gauge label and particle gauge index dictionary.
-  
+
   Parameters:
   - gaugeLabel_String: The label used to generate gauge indices.
   - particleGaugeIndDict_Association: An association mapping integers to gauge index identifiers.
-  
+
   Returns:
   - A function that takes IYT data and chains, and returns the combined list of epsilon objects and updated chains.
 *)
@@ -597,10 +571,10 @@ AppendChainsWithGaugeIndices[gaugeLabel_String, particleGaugeIndDict_Association
     UpdateFieldElement,
     updatedChains
   },
-  
+
   (* Generate a gauge index generator based on the provided gauge label *)
   gaugeIndiceGenerator = GetIndiceGen[gaugeLabel];
-  
+
   (* Create replacement rules for gauge indices from number to symbol *)
   gaugeIndexReplaceRules = Dispatch[
     Table[
@@ -608,13 +582,13 @@ AppendChainsWithGaugeIndices[gaugeLabel_String, particleGaugeIndDict_Association
       {id, Sort@Flatten@Values@particleGaugeIndDict}
     ]
   ];
-  
+
   (* Generate epsilon objects by replacing indices in iytData *)
   epsilonObjects = ReplaceAll[gaugeIndexReplaceRules] /@ Flatten[{"\[Epsilon]", ##}] & /@ Transpose@iytData;
-  
+
   (* Create a dictionary for particle gauge symmetries *)
   particleGaugeSymDict = ReplaceAll[gaugeIndexReplaceRules] /@ particleGaugeIndDict;
-  
+
   (* Define a local function to update each field object *)
   UpdateFieldElement = Function[element,
     Which[
@@ -624,10 +598,10 @@ AppendChainsWithGaugeIndices[gaugeLabel_String, particleGaugeIndDict_Association
         element
     ]
   ];
-  
+
   (* Apply the UpdateFieldElement function to each relevant sublist within chains *)
   updatedChains = Map[UpdateFieldElement, chains, Infinity];
-  
+
   (* Combine epsilon objects with updated chains *)
   Join[epsilonObjects, updatedChains]
 ]
@@ -640,58 +614,58 @@ AppendChainsWithGaugeIndices[gaugeLabel_String, particleGaugeIndDict_Association
 
 ClearAll[TranslateCheckComplete]
 
-(* 
+(*
   TranslateCheckComplete:
   Checks if the chains list does not contain any patterns matching {sb|ab, n_Integer, ___} or {___, n_Integer, sb|ab}.
-  
+
   Parameters:
   - chains_List: The list of chains to be checked.
-  
+
   Returns:
   - True if no such patterns are found, False otherwise.
 *)
-TranslateCheckComplete[chains_List] := 
-  Count[chains, {sb | ab, n_Integer, ___}] + 
+TranslateCheckComplete[chains_List] :=
+  Count[chains, {sb | ab, n_Integer, ___}] +
   Count[chains, {___, n_Integer, sb | ab}] == 0
 
 
 ClearAll[RearrangeIndex]
 
-(* 
+(*
   RearrangeIndex:
   Replaces old `label` indices with new generated ones as sorted.
-  
+
   Parameters:
   - label_String: The label used to identify and generate new gauge indices.
   - chains_List: The list of chains to be processed.
-  
+
   Returns:
   - Updated chains with rearranged gauge indices.
 *)
 RearrangeIndex[label_String][chains_List] := Module[
   {
-    allIndices, 
-    newIndicesGenerator, 
+    allIndices,
+    newIndicesGenerator,
     indicesReplaceRules
   },
   (* Extract all unique indices that start with the specified label followed by "$" *)
-  allIndices = 
+  allIndices =
     Cases[
-      Flatten@chains, 
+      Flatten@chains,
       a_ /; StringStartsQ[label <> "$"]@ToString@a
     ] // DeleteDuplicates;
-  
+
   (* Initialize a new gauge index generator based on the label *)
   newIndicesGenerator = GetIndiceGen[label];
-  
+
   (* Create replacement rules mapping old indices to new generated indices *)
   indicesReplaceRules = Dispatch[
     Table[
-      oldId -> newIndicesGenerator[], 
+      oldId -> newIndicesGenerator[],
       {oldId, allIndices}
     ]
   ];
-  
+
   (* Apply the replacement rules to rearrange indices in chains *)
   chains /. indicesReplaceRules
 ]
@@ -699,25 +673,25 @@ RearrangeIndex[label_String][chains_List] := Module[
 
 ClearAll[WeylObjsCanonical]
 
-(* 
+(*
   WeylObjsCanonical:
   Processes the chains to separate epsilon chains, trace chains, psi chains, and others.
   It then rearranges the indices for the "LI" label.
-  
+
   Parameters:
   - chains_List: The list of chains to be canonicalized.
-  
+
   Returns:
   - A rearranged list of chains with canonicalized Weyl objects.
 *)
 WeylObjsCanonical[chains_List] := Module[
   {
-    epsilonChains, 
-    traceChains, 
+    epsilonChains,
+    traceChains,
     psiChains, mts,mts2,
     otherChains
   },
-  
+
   (* Extract chains that start with "\[CurlyEpsilon]" *)
   epsilonChains = Cases[chains, {"\[Epsilon]", ___}];
   (* Extract chains that start with "MT" *)
@@ -725,17 +699,17 @@ WeylObjsCanonical[chains_List] := Module[
   (* Extract chains that start with "Tr" *)
   traceChains = Cases[chains, {{"Tr"}, ___}];
   (* Extract chains that start with "\[CapitalPsi]" *)
-  psiChains = Cases[chains, {{"\[Psi]", ___}, ___}];  
+  psiChains = Cases[chains, {{"\[Psi]", ___}, ___}];
   (* Identify other chains not classified as epsilon, trace, or psi chains *)
   otherChains = ComplementMultiSet[chains,epsilonChains,mts,traceChains,psiChains];
-  
+
   (* Replace specific trace chains with "MT" if conditions are met *)
-  mts2=Cases[traceChains, 
-    {{"Tr"}, {s1_, lor1_}, {s2_, lor2_}} /; 
+  mts2=Cases[traceChains,
+    {{"Tr"}, {s1_, lor1_}, {s2_, lor2_}} /;
       Length@Complement[{"\[Sigma]", "\[Sigma]Bar"}, {s1, s2}] == 0];
   traceChains = ComplementMultiSet[traceChains, mts2];
   mts=Join[mts,mts2//.{{"Tr"}, {s1_, lor1_}, {s2_, lor2_}}:> {"MT", lor1, lor2}];
-   
+
   (* Rearrange indices for "LI" label and combine all chains *)
   RearrangeIndex["LI"]@Join[epsilonChains, psiChains, otherChains, mts, traceChains]
 ]
@@ -743,24 +717,25 @@ WeylObjsCanonical[chains_List] := Module[
 
 
 ClearAll[Amp2WeylOp]
+Amp2WeylOp::usage = "Amp2WeylOp[n, opts][amp] translates a spinor-helicity monomial, optionally with gauge tableaux, to the package Weyl-operator chain representation.";
 
-(* 
+(*
   Amp2WeylOp:
   Transforms an amplitude into its Weyl operator representation based on provided options.
-  
+
   Parameters:
   - np_: An integer parameter representing a specific property or identifier.
   - OptionsPattern[]: Optional parameters including:
       - mass (default: All)
       - su2ShapeList (default: {})
       - su3ShapeList (default: {})
-  
+
   Usage:
   Amp2WeylOp[np, mass -> masses, su2ShapeList -> su2s, su3ShapeList -> su3s][{IYTs__, amp}]
   Amp2WeylOp[np, mass -> masses][amp]
 *)
 Options[Amp2WeylOp] = {mass -> All, su2ShapeList -> {}, su3ShapeList -> {}};
-Amp2WeylOp[np_Integer, OptionsPattern[]][{IYTs__, amp_?AmplitudeSingletQ}/; 
+Amp2WeylOp[np_Integer, OptionsPattern[]][{IYTs__, amp_?AmplitudeSingletQ}/;
  AllTrue[Head /@ {IYTs}, MatchQ[IYT]]] := Module[
   {
     iytsList = List[IYTs],
@@ -770,40 +745,40 @@ Amp2WeylOp[np_Integer, OptionsPattern[]][{IYTs__, amp_?AmplitudeSingletQ}/;
     su3IndDict,
     result
   },
-  
+
   (* Create SU2 Indices Dictionary *)
   su2IndDict = If[
     Length[su2Shapes] == 0 || Count[su2Shapes, ""] == Length[su2Shapes],
     <||>,
     GetGaugeIndDict[Lookup[su2ShapeDict, #, ""] & /@ su2Shapes]
   ];
-  
+
   (* Create SU3 Indices Dictionary *)
   su3IndDict = If[
     Length[su3Shapes] == 0 || Count[su3Shapes, ""] == Length[su3Shapes],
     <||>,
     GetGaugeIndDict[Lookup[su3ShapeDict, #, ""] & /@ su3Shapes]
   ];
-  
+
   (* Initialize Result by Applying Amp2WeylOp *)
   result = Amp2WeylOp[np, mass -> OptionValue[mass]][amp];
-  
+
   (* Append Gauge Indices Based on Dictionaries and IYTsList Length *)
   Which[
     Length[su2IndDict] > 0 && Length[su3IndDict] > 0 && Length[iytsList] == 2,
       result = AppendChainsWithGaugeIndices["su3", su3IndDict][iytsList[[2]], result];
       result = AppendChainsWithGaugeIndices["su2", su2IndDict][iytsList[[1]], result];,
-    
+
     Length[su2IndDict] > 0 && Length[iytsList] == 1,
       result = AppendChainsWithGaugeIndices["su2", su2IndDict][iytsList[[1]], result];,
-    
+
     Length[su3IndDict] > 0 && Length[iytsList] == 1,
       result = AppendChainsWithGaugeIndices["su3", su3IndDict][iytsList[[1]], result];,
-    
+
     True,
       Print["Warning: Mismatch in YT amount or gauge shape."]
   ];
-  
+
   (* Return the Final Result *)
   Return[result]
 ]
@@ -820,49 +795,49 @@ Amp2WeylOp[np_Integer, OptionsPattern[]][amp_?AmplitudeSingletQ] := Module[
     posG,
     re
   },
-  
+
   (* Generate configuration *)
   config = Transpose@Amp2MetaInfo[amp, np, mass -> OptionValue[mass]];
-  
+
   (* Check spin limit *)
   If[Max /@ Abs /@ First /@ config > 3/2,
     Print["spin > 3/2, not implemented"];
     Abort[]
   ];
-  
+
   (* Create massless rules *)
   ruleMassless = Table[2 np + 1 - i -> i, {i, np}];
-  
+
   (* Find and replace psi chains *)
   psiChain = FindPsiChain[amp, np, mass -> OptionValue[mass]][[2]] /. ruleMassless;
-  
+
   (* Initialize index generator *)
   lorgen = GetIndiceGen["LI"];
-  
+
   (* Initialize result association *)
   re = <||>;
-  
+
   (* Translate D *)
   re["D"] = DtranslateAll[lorgen][psiChain];
-  
+
   (* Find positions in config *)
   posPhi = Flatten@Position[config, {0, 0}];
   posPsi = Flatten@Position[config, {1/2 | -1/2, _}];
   posV = Flatten@Position[config, {1 | -1, _}];
   posG = Flatten@Position[config, {3/2 | -3/2, _}];
-  
+
   (* Translate Phi, Psi, Vector, and Gravitino chains *)
   re["phi"] = Fold[TranslatePhi[#2][#1] &, Join[{re["D"]}, posPhi]];
   re["psi"] = Fold[TranslatePsi[#2][#1] &, Join[{re["phi"]}, posPsi]];
   re["V"] = Fold[TranslateVector[lorgen, #2][#1] &, Join[{re["psi"]}, posV]];
   re["Gravitino"] = Fold[TranslateGravitino[lorgen, #2][#1] &, Join[{re["V"]}, posG]];
-  
+
   (* Verify translation completeness *)
   If[!TranslateCheckComplete[re["Gravitino"]],
     Print["Warning! Translation not complete!"];
     Abort[]
   ];
-  
+
   (* Return canonical Weyl objects *)
   Return@WeylObjsCanonical[re["Gravitino"]]
 ]

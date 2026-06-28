@@ -2,6 +2,8 @@
 
 LogPri["FormatOutput Loaded"];
 ClearAll[DisplayYT];
+DisplayYT::usage =
+  "DisplayYT[yt] displays a Young-tableau-like list or IYT expression as a framed Grid.";
 DisplayYT[warpedYt_, h_ : IYT] /; Head@warpedYt === h := DisplayYT[warpedYt[[1]]];
 DisplayYT[yt_List] := Grid[yt, Frame -> {None, None,
   Flatten@Table[{i, j} -> True, {i, Length@yt}, {j,
@@ -18,6 +20,10 @@ DisplayYT[ytExpr_, h_ : IYT] /; NumberQ@ytExpr := ytExpr;
 (*defaultSbkFun = "\\sbk{" <> # <> "}"&;*)
 (*TODO deal with minus*)
 ClearAll[defaultAbkFun,defaultSbkFun,ExportAmp2Tex,ExportAmpMassive2Tex];
+ExportAmp2Tex::usage =
+  "ExportAmp2Tex[amp] exports a spinor-helicity amplitude to a compact TeX string. Custom angle and square bracket formatters may be supplied.";
+ExportAmpMassive2Tex::usage =
+  "ExportAmpMassive2Tex[n][amp] exports an n-point massive amplitude after relabeling conjugate massive spinors with primed labels.";
 defaultAbkFun = "\\left\\langle " <> # <> "\\right\\rangle"&;
 defaultSbkFun = "\\left[" <> # <> "\\right]"&;
 ab /: ExportAmp2Tex[ab[i_, j_], abkFun_, sbkFun_] := abkFun[ToString@i <> ToString@j];
@@ -34,7 +40,7 @@ ExportAmpMassive2Tex[np_Integer] := ExportAmp2Tex[Last@FactorizeBracket@#& /@ Re
 
 
 ClearAll[allowedLorentz,generalRules,defaultExternalRules,FieldTranslationRule,WrapBra,ExtractIndsWithLabel];
-allowedLorentz = {"\[Mu]", "\[Nu]", "\[Rho]", "\[Xi]", "\[Tau]", "\[Zeta]", "\[Eta]", "\[Theta]", "\[Iota]", "\[Kappa]", "\[Lambda]"}; 
+allowedLorentz = {"\[Mu]", "\[Nu]", "\[Rho]", "\[Xi]", "\[Tau]", "\[Zeta]", "\[Eta]", "\[Theta]", "\[Iota]", "\[Kappa]", "\[Lambda]"};
 
 generalRules = {
   {"Tr"} -> "\\operatorname{Tr}",
@@ -50,53 +56,55 @@ generalRules = {
 
 defaultExternalRules = {
   {"\[Phi]", n_, o___} :> StringJoin["\\phi_", "{", ToString@n ,"}^{", o, "}"],
-  {"\[Psi]", n_Integer, r_, i_, o___} :> 
+  {"\[Psi]", n_Integer, r_, i_, o___} :>
     StringJoin["{\\psi}_{", ToString@n, i, ",", r, "}", "^{", o, "}"],
-  {"\[Psi]bar", n_Integer, r_, i_, o___} :> 
+  {"\[Psi]bar", n_Integer, r_, i_, o___} :>
     StringJoin["{\\psi}_{", ToString@n, i, ",", r, "}", "^{\\dagger\\ ", o, "}"],
-  {"\[Psi]", n_Integer, r_, o___} :> 
+  {"\[Psi]", n_Integer, r_, o___} :>
     StringJoin["{\\psi}_{", ToString@n, ",", r, "}", "^{", o, "}"],
-  {"\[Psi]bar", n_Integer, r_, o___} :> 
+  {"\[Psi]bar", n_Integer, r_, o___} :>
     StringJoin["{\\psi}_{", ToString@n, ",", r, "}", "^{\\dagger\\ ", o, "}"],
-  {"A", n_, i_, o___} :> 
+  {"A", n_, i_, o___} :>
     StringJoin["{A}_{", ToString@n, ",", i, "}", "^{", o, "}"],
-  {"F+", n_, i_, j_, o___} :> 
+  {"F+", n_, i_, j_, o___} :>
     StringJoin["{F}_{", ToString@n, ",", i, " ", j, "}", "^{+\\ ", o, "}"],
-  {"F-", n_, i_, j_, o___} :> 
+  {"F-", n_, i_, j_, o___} :>
     StringJoin["{F}_{", ToString@n, ",", i, " ", j, "}", "^{-\\ ", o, "}"]
 };
 
 FieldTranslationRule[n_Integer, {field_String}]:=FieldTranslationRule[n, {field, ""}];
 FieldTranslationRule[n_Integer, {field_String, fieldLongitude_String}] := {
   {"\[Phi]", n, o___} :> StringJoin["{", field, "}^{", o, "}"],
-  {"\[Psi]", n, r_, i_, o___} :> 
+  {"\[Psi]", n, r_, i_, o___} :>
     StringJoin["{", field, "}_{", i, ",", r, "}", "^{", o, "}"],
-  {"\[Psi]bar", n, r_, i_, o___} :> 
+  {"\[Psi]bar", n, r_, i_, o___} :>
     StringJoin["{", field, "}_{", i, ",", r, "}", "^{\\dagger\\ ", o, "}"],
-  {"\[Psi]", n, r_, o___} :> 
+  {"\[Psi]", n, r_, o___} :>
     StringJoin["{", field, "}_{", r, "}", "^{", o, "}"],
-  {"\[Psi]bar", n, r_, o___} :> 
+  {"\[Psi]bar", n, r_, o___} :>
     StringJoin["{", field, "}_{", r, "}", "^{\\dagger\\ ", o, "}"],
-  {"A", n, i_, o___} :> 
+  {"A", n, i_, o___} :>
     StringJoin["{", If[fieldLongitude != "", fieldLongitude, field], "}_{", i, "}", "^{", o, "}"],
-  {"F+", n, i_, j_, o___} :> 
+  {"F+", n, i_, j_, o___} :>
     StringJoin["{", field, "}_{", i, " ", j, "}", "^{+\\ ", o, "}"],
-  {"F-", n, i_, j_, o___} :> 
+  {"F-", n, i_, j_, o___} :>
     StringJoin["{", field, "}_{", i, " ", j, "}", "^{-\\ ", o, "}"]
 };
 
 (* Add parentheses *)
 WrapBra[expr___] := {{"braL"}, expr, {"braR"}};
 
-ExtractIndsWithLabel[label_String][obj_List] := 
+ExtractIndsWithLabel[label_String][obj_List] :=
   Cases[obj, s_Symbol /; StringMatchQ[SymbolName[s], label <> "$" ~~ ___], Infinity] // DeleteDuplicates // Sort;
 
 
 
 ClearAll[ExportWeylOp2Tex]
+ExportWeylOp2Tex::usage =
+  "ExportWeylOp2Tex[weylChain, opts] exports a Weyl-operator chain to TeX.";
 antiFermionList::usage="position of anti-fermion. use this option to flip psi and add dagger.";
 externalFieldNamesDict::usage="
-Default value is  string Default. 
+Default value is  string Default.
 Use non-default name to translate field. Key should be particle num, values should be list of name strings.
 Example external-><|1->{W^+,W^+},2->{W^-,W^-},3->{g,G},4->{A,F},5->{\\nu_e},6->{e}|>";
 Options[ExportWeylOp2Tex]={antiFermionList->{},externalFieldNamesDict->"Default"};
@@ -143,6 +151,8 @@ Options[ExportTexList2Array] = {
   prefix -> "\t",
   suffix -> "\\\\\n"
 };
+ExportTexList2Array::usage =
+  "ExportTexList2Array[list, opts] formats a list of TeX strings as a TeX array-like environment.";
 ExportTexList2Array[{}, OptionsPattern[]] := "\\text{None}\n";
 ExportTexList2Array[l_List, OptionsPattern[]] /; StringQ[l[[1]]] :=
     With[{},

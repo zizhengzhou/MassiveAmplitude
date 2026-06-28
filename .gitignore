@@ -1,17 +1,11 @@
-#IntelliJ IDEA
-.idea/
-.settings/
-
-#eclipse
-.project
-.WolframResources
-
-#disabled files
-*.disable
-
-#test files
-Massive/Tests/* 
-
-#output files
-Massive/Output/* 
-Massive/Output/* 
+.DS_Store
+Thumbs.db
+*.mx
+*.nb
+*.bak
+*.tmp
+*.aux
+*.log.tmp
+.tmp*/
+__tmp*
+logs/*_latest.wl

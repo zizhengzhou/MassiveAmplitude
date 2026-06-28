@@ -9,7 +9,8 @@
 
 
 ClearAll[Poly2Singlet];
-ConstructIndepCFBlock::usage = "Extract the singlet from a polymomial";
+Poly2Singlet::usage =
+  "Poly2Singlet[expr] extracts distinct monomial terms from a polynomial expression, dropping numeric coefficients.";
 Poly2Singlet[amp_List] := Poly2Singlet /@ amp // Flatten // DeleteDuplicates;
 Poly2Singlet[amp_Plus] := Poly2Singlet /@ (List @@ amp) // Flatten // DeleteDuplicates;
 Poly2Singlet[c_?NumberQ * b_] := {b};
@@ -18,10 +19,11 @@ Poly2Singlet[c_?NumberQ] := {};
 Poly2Singlet[b_] := {b};
 ClearAll[ConstructIndepCFBlock];
 Options@ConstructIndepCFBlock = {mass -> All, timeDebug -> False};
-ConstructIndepCFBlock::usage = "Construct specific cf block. Reduandancy removed locally. Return {idenpendent basis,coeff matrix, basis}";
+ConstructIndepCFBlock::usage =
+  "ConstructIndepCFBlock[spins, codeDim, polarization, opts] constructs a fixed-polarization CF block, reduces it in the massless limit, removes local linear redundancy, and returns {independentAmplitudes, coefficientMatrix, monomialBasis}.";
 ConstructIndepCFBlock[spins_List, codeDim_, polarization_List, OptionsPattern[]] := Module[{
     np = Length@spins,
-    cf0, masslessLimitRule, rcfHE, basis, coeff, posIndep, TimingPrint}, 
+    cf0, masslessLimitRule, rcfHE, basis, coeff, posIndep, TimingPrint},
    If[OptionValue@timeDebug,
     TimingPrint[label_String][{time_, result_}] := Block[{},
        Print[label <> " cost ", time, "s"];
@@ -66,6 +68,8 @@ GetDCodeListUpdate[spinList_, phyDim_, massList_] := Module[{positions, dimEva, 
    finalCombo // SortBy[First]];
 ClearAll[GenerateNeedCFBlocks];
 Options@GenerateNeedCFBlocks = {mass -> All};
+GenerateNeedCFBlocks::usage =
+  "GenerateNeedCFBlocks[spins, physicalDim, opts] returns the code dimensions and polarization sectors needed by the legacy CF-block pipeline at a physical dimension.";
 GenerateNeedCFBlocks[spins_, physicalDim_, OptionsPattern[]] := GetDCodeListUpdate[spins, physicalDim, MassOption[OptionValue@mass, Length@spins]];
 
 
@@ -77,7 +81,7 @@ ClearAll[FilterCFBlocksByIdentical,ReAssignIdentical];
 FilterCFBlocksByIdentical[cfBlocks_List, identicals_List] := Module[{identicalList,CheckValid,selected},
 If[Length@cfBlocks == 0, Return[{}]];
 If[Length@identicals == 0, Return[cfBlocks]];
-identicalList=If[!IntegerQ[#[[-1]]],Most[#],#]&/@identicals; 
+identicalList=If[!IntegerQ[#[[-1]]],Most[#],#]&/@identicals;
 CheckValid[{d_Integer, polar_List}, pos_List] :=   OrderedQ[polar[[pos]]];
 CheckValid[pos_List]:=CheckValid[#,pos]&;
 selected=Fold[Select,cfBlocks,CheckValid/@identicalList]
@@ -94,7 +98,7 @@ result];
 ReAssignIdentical[{d_Integer, polar_List},identicals_List]:=ReAssignIdentical[polar,identicals];
 
 
-ClearAll[GetCFBlockPermuteOperatorDict]; 
+ClearAll[GetCFBlockPermuteOperatorDict];
 GetCFBlockPermuteOperatorDict[cfBlock:{cfs_List,coeffs_List,basis_List},identicals_List,np_Integer]:=Module[{operatorDict,masslessLimitRule,masslessLimitCF,CalcRuleMatrix,rules},
 operatorDict=Association@Table[id->Null,{id,identicals}];
 masslessLimitRule=Table[2*np+1-i->i,{i,np}];
@@ -126,7 +130,7 @@ If[Length@originalBasisOpDict==0, Return[{gaugedBasis,originalBasisOpDict}];];Co
          AssociateTo[cOpD2, temp2];];
        MapThread[Normal@MapThread[KroneckerProduct, {KeySort@Association@#1 , KeySort@Association@#2}] &, {KeySort@cOpD2 , KeySort@lOpD }]
        ];
-     {gaugedBasis, CombineOpDict[gaugeBasisOpDict, originalBasisOpDict]} 
+     {gaugedBasis, CombineOpDict[gaugeBasisOpDict, originalBasisOpDict]}
      ];
 
 
@@ -149,8 +153,10 @@ Return[{}];];
 identicalCFBlocks=FilterCFBlocksByIdentical[cfBlocks,identicalParam];
 If[OptionValue[log],Print["identical remove:",Length@cfBlocks-Length@identicalCFBlocks," blocks remain ",Length@identicalInfoDict];];
 cfBlocks=identicalCFBlocks;
+Print[cfBlocks];
 (*Lorentz cancel filter on cf*)AbsoluteTiming@Block[{},cfBlocksDict=Association@Table[block->ConstructIndepCFBlock[spins,block[[1]],block[[2]],mass->masses],{block,cfBlocks}];
 cfBlocksDict=cfBlocksDict//DeleteCases[{}];]//If[OptionValue[log],Print["construct cf cost ",#[[1]],"s"]]&;
+Print[cfBlocksDict];
 If[OptionValue[log],Print["Lorentz cancel remove:",Length@cfBlocks-Length@cfBlocksDict," blocks remain ",Length@cfBlocksDict];];
 cfBlocks=Keys@cfBlocksDict;
 (*Calc sub identical types*)
@@ -172,7 +178,8 @@ Return[{su3Basis,su3IdenticalOpDict}];];
 ConstructSUNBlocks[suNshape_List,ConstructSUNBlocks_]:=Module[{suNSubIdenticals,reserveIdenticalsDict,suNIdenticalDict,suNBasis,suNIdenticalOpDict,temp},
 suNSubIdenticals=Select[(Union[suNshape[[Most@#]]]=!={""})&]/@allSubIdenticals;
 reserveIdenticalsDict=AssociationThread[allSubIdenticals,suNSubIdenticals];
-suNIdenticalDict=Association@Table[id->ConstructSUNBlocks[id],{id,suNSubIdenticals}]; 
+Print[];
+suNIdenticalDict=Association@Table[id->ConstructSUNBlocks[id],{id,suNSubIdenticals}];
 suNBasis=suNIdenticalDict[reserveIdenticalsDict@identicalInfoDict@#][[1]]&;
 suNIdenticalOpDict=suNIdenticalDict[reserveIdenticalsDict@identicalInfoDict@#][[2]]&;
 temp=Association@Table[cfBlockInfo->AttachSUNBlocks[suNBasis[cfBlockInfo],suNIdenticalOpDict[cfBlockInfo],finalBasisDict[cfBlockInfo],finalIdenticalOpDict[cfBlockInfo]],{cfBlockInfo,cfBlocks}];
