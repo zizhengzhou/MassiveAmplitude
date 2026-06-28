@@ -31,8 +31,11 @@ Inputs:
 * `leftSpin`: spin of both heavy particles 1 and 2.
 * `rightSpins`: spins of particles 3 through n.
 * `rightMass`: optional list of massive right-side particle labels, such as
-  `{3}` or `{3, 4}`.  If omitted, the current default is the first right-side
-  particle.
+  `{3}` or `{3, 4}`.  In `ConstructProjectedSewingRelativeChiralBasis`,
+  `Automatic` means all right-side particles `3..n` are massive.  Labels 1 and
+  2 are always massive internally, and explicit `rightMass` lists may contain
+  only labels 3 through n.  The expert fixed-right-polarization constructors
+  keep their historical `Automatic` default `{3}`.
 * `ampDim`: amplitude dimension used in the paper convention.
 * `identicalParam`: right-side identical groups such as `{{3, 4}}`.
 

@@ -16,6 +16,7 @@ scripts = {
   "sewing_left_open_extreme_structures.wls",
   "sewing_relative_chiral_basis_interface.wls",
   "projected_sewing_probe.wls",
+  "projected_bbar_b_vector_longitudinal_regression.wls",
   "projected_right_polarization_filter.wls",
   "projected_right_polarization_filter_equivalence.wls",
   "projected_sewing_su3_probe.wls",

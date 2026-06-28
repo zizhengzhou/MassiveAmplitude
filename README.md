@@ -35,6 +35,10 @@ The function returns an association keyed by relative chiral order.  Without
 color structures, each value is a list of symbolic Lorentz basis elements.  With
 `su3ShapeList`, each value is a list of associations containing
 `LorentzSymbolForm`, `SU3Basis`, `SU3IndexDictionary`, and `DirectProduct`.
+The optional `rightMass` argument contains only right-side massive particle
+labels, such as `{3}` or `{3, 4}`.  In this projected constructor,
+`Automatic` means all right-side particles `3..n` are massive; particles 1 and
+2 are always treated as massive internally.
 
 Use `ReturnProjectionData -> True` when debugging or validating a sector.  It
 returns the grouped basis plus sector records, CF/sewing ranks, Young operators,

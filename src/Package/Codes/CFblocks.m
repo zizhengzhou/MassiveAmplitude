@@ -47,30 +47,23 @@ ConstructIndepCFBlock[spins_List, codeDim_, polarization_List, OptionsPattern[]]
 (*CF blocks*)
 
 
-ClearAll[GetDCodeListUpdate,ClassifyPolarsByIdentical,MergeIdenticalClassification];
-GetDCodeListUpdate[spinList_, phyDim_, massList_] := Module[{positions, dimEva, nAmin, codeDimList, codeDimListRule, nAList, newLists, correspondences, np, polar, modifiedL1, polarChoiceList, finalCombo},(*Compute positions where spinList and massList are non-zero*)positions = Select[Range[Length[spinList]], spinList[[#]] != 0 && massList[[#]] != 0 &];
-   (*Evaluate total dimension*)dimEva = Total[(Abs[spinList] /. {1 -> 2, 0 -> 1, 1/2 -> 3/2, 3/2 -> 5/2})];
-   (*Check for invalid dimensions*)If[(dimEva - Length[positions]) > phyDim || ! IntegerQ[dimEva], {}];
-   (*Compute minimum and maximum nA values*)nAmin = Max[dimEva - phyDim, 0];
-   codeDimList = Table[{i1, phyDim + i1}, {i1, nAmin, Length[positions]}];
-   codeDimListRule = Rule @@@ codeDimList;
-   nAList = Table[i1, {i1, nAmin, Length[positions]}];
-   newLists = Table[Range[0, 2*num], {num, Abs[spinList]}];
-   correspondences = Table[Table[newLists[[a]][[Length[newLists[[a]]] - i + 1]] -> newLists[[a, i]], {i, 1, Floor[Length[newLists[[a]]]/2]}], {a, 1, Length[newLists]}];
-   np = Length[massList];
-   polar = Fold[(Flatten[#, 1] &@Table[l~Append~i, {l, #1}, {i, 0, If[massList[[#2]] === 0, 0, 2*spinList[[#2]]]}]) &, {{}}, Range[np]] // DeleteCases[ConstantArray[0, np]];
-   modifiedL1 = Table[(polar[[a, i]] /. correspondences[[i]]), {a, 1, Length[polar]}, {i, 1, Length[correspondences]}];
-   polar = Table[{Total[modifiedL1[[i]]], polar[[i]]}, {i, 1, Length[polar]}];
-   polar = Append[polar, {0, ConstantArray[0, np]}];
-   polarChoiceList = Select[polar, MemberQ[nAList, #[[1]]] &];
-   (*Compute final combinations*)
-   finalCombo = {#[[1]] /. codeDimListRule, #[[2]]} & /@ polarChoiceList;
-   finalCombo // SortBy[First]];
+ClearAll[GenerateCFBlockPolarizations, ClassifyPolarsByIdentical,MergeIdenticalClassification];
+GenerateCFBlockPolarizations[spins_List, masses_List] := Module[{np = Length[spins]},
+  Tuples @ Table[
+    If[masses[[i]] === 0, {0}, Range[0, 2 Abs[spins[[i]]]]],
+    {i, np}
+  ]
+];
 ClearAll[GenerateNeedCFBlocks];
 Options@GenerateNeedCFBlocks = {mass -> All};
 GenerateNeedCFBlocks::usage =
-  "GenerateNeedCFBlocks[spins, physicalDim, opts] returns the code dimensions and polarization sectors needed by the legacy CF-block pipeline at a physical dimension.";
-GenerateNeedCFBlocks[spins_, physicalDim_, OptionsPattern[]] := GetDCodeListUpdate[spins, physicalDim, MassOption[OptionValue@mass, Length@spins]];
+  "GenerateNeedCFBlocks[spins, ampDim, opts] enumerates all allowed fixed-polarization CF block descriptors {ampDim + n, polarization}. Massive entries are determined only by MassOption[mass, n]; massless entries allow only polarization 0.";
+GenerateNeedCFBlocks[spins_List, ampDim_Integer, OptionsPattern[]] := Module[
+  {np = Length[spins], masses, polarizations},
+  masses = MassOption[OptionValue@mass, np];
+  polarizations = GenerateCFBlockPolarizations[spins, masses];
+  SortBy[{ampDim + np, #} & /@ polarizations, #[[2]] &]
+];
 
 
 (* ::Subsection:: *)
@@ -142,21 +135,19 @@ ClearAll[ConstructGeneralBasis];
 su2ShapeList::usage="As an option identifies the su2 type of particles. Either {} or a list with length of spins. Each element should be in Keys@su2ShapeDict";
 su3ShapeList::usage="As an option identifies the su3 type of particles. Either {} or a list with length of spins. Each element should be in Keys@su3ShapeDict";
 Options[ConstructGeneralBasis]={mass->All,su2ShapeList->{},su3ShapeList->{},log->False};
-ConstructGeneralBasis[spins_List,physicalDim_Integer,identicalParam_List,opts:OptionsPattern[]]:=Module[{masses,np,identicalList,cfBlocks,identicalCFBlocks,cfBlocksDict,identicalInfoDict,allSubIdenticals,cfIdenticalDict,identicalYExprDict,finalBasisDict,finalIdenticalOpDict,re,ConstructSU2Blocks,ConstructSU3Blocks,ConstructSUNBlocks,GetTotalYOp,GetIndependentBasisByY},masses=MassOption[OptionValue[mass],Length@spins];
+ConstructGeneralBasis[spins_List,ampDim_Integer,identicalParam_List,opts:OptionsPattern[]]:=Module[{masses,np,identicalList,cfBlocks,identicalCFBlocks,cfBlocksDict,identicalInfoDict,allSubIdenticals,cfIdenticalDict,identicalYExprDict,finalBasisDict,finalIdenticalOpDict,re,ConstructSU2Blocks,ConstructSU3Blocks,ConstructSUNBlocks,GetTotalYOp,GetIndependentBasisByY},masses=MassOption[OptionValue[mass],Length@spins];
 np=Length@spins;
 If[identicalParam==={},identicalList={},identicalList=(#~Append~If[OddQ[2*spins[[#[[1]]]]],"A","S"])&/@identicalParam];
 (*Lorentz blocks*)
-cfBlocks=GenerateNeedCFBlocks[spins,physicalDim,mass->masses];
+cfBlocks=GenerateNeedCFBlocks[spins,ampDim,mass->masses];
 If[Length@cfBlocks==0,If[OptionValue[log],Print["no cf block!"];];
 Return[{}];];
 (*identical filter on cf*)
 identicalCFBlocks=FilterCFBlocksByIdentical[cfBlocks,identicalParam];
 If[OptionValue[log],Print["identical remove:",Length@cfBlocks-Length@identicalCFBlocks," blocks remain ",Length@identicalInfoDict];];
 cfBlocks=identicalCFBlocks;
-Print[cfBlocks];
 (*Lorentz cancel filter on cf*)AbsoluteTiming@Block[{},cfBlocksDict=Association@Table[block->ConstructIndepCFBlock[spins,block[[1]],block[[2]],mass->masses],{block,cfBlocks}];
 cfBlocksDict=cfBlocksDict//DeleteCases[{}];]//If[OptionValue[log],Print["construct cf cost ",#[[1]],"s"]]&;
-Print[cfBlocksDict];
 If[OptionValue[log],Print["Lorentz cancel remove:",Length@cfBlocks-Length@cfBlocksDict," blocks remain ",Length@cfBlocksDict];];
 cfBlocks=Keys@cfBlocksDict;
 (*Calc sub identical types*)

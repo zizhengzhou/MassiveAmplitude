@@ -17,16 +17,16 @@ fullMassFromCase[rightSpins_List, rightMass_List] := Join[
 ];
 
 legacyCount[case_Association, timeoutSeconds_Integer] := Module[
-  {spins, fullMass, codeDim, basis},
+  {spins, fullMass, basis},
   spins = Join[{case["LeftSpin"], case["LeftSpin"]}, case["RightSpins"]];
   fullMass = fullMassFromCase[case["RightSpins"], case["RightMass"]];
-  codeDim = case["AmpDim"] + Length[spins];
+
   basis = TimeConstrained[
     Quiet@Check[
       Block[{Print = (Null &)},
         MassiveBasis`Private`ConstructGeneralBasis[
           spins,
-          codeDim,
+          case["AmpDim"],
           case["Identical"],
           mass -> fullMass
         ]

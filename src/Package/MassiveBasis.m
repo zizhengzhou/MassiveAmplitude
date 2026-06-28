@@ -22,6 +22,7 @@ Print["Loading MassiveBasis..."];
 {SewingSortData, SewingSortDataQ, SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder, SewingBasisSortKey, SewingSortRecordsForBasis};
 {MassiveSpin};
 {ab, sb};
+{Q, Xhard, Xsoft};
 {Sum2List, Prod2List, FindIndependentBasisPos, FindCoordinate};
 {ReplaceBraNumber, YTtoAmpmass};
 {ClearCache, CacheFunction};
@@ -112,6 +113,9 @@ suffix::usage = "suffix is an option specifying the suffix inserted after each T
 MassiveSpin::usage = "MassiveSpin is an option specifying the equal heavy-pair spin used by the left three-point current constructor.";
 PointCount::usage = "PointCount is an option specifying the full physical point count used for massive-label relabeling and reduction.";
 QReplacement::usage = "QReplacement is an option controlling how the left-current Q label is replaced before sewing. The sewing default is {1,-2}, i.e. Q = p1 - p2.";
+Q::usage = "Q is the formal momentum label used in symbolic sewing output for the heavy-pair relative momentum. Internal reduction replaces it through QReplacement, whose default is {1,-2}.";
+Xhard::usage = "Xhard is a formal symbolic factor tracking the hard/static heavy-pair structure in sewing output. Internal reduction maps it to the corresponding spinor expression.";
+Xsoft::usage = "Xsoft is a formal symbolic factor tracking the soft/recoil heavy-pair structure in sewing output. Internal reduction maps it to the corresponding spinor expression.";
 Labels::usage = "Labels is an option specifying the ordered label set used by residual SSYT enumeration.";
 PhysicalLabels::usage = "PhysicalLabels is an option specifying physical right-side labels in residual enumeration.";
 SupplementLabels::usage = "SupplementLabels is an option specifying supplemental labels used before projection to J.";
@@ -127,8 +131,8 @@ RejectMasslessSelfColumns::usage = "RejectMasslessSelfColumns is an option dropp
 ReturnRejected::usage = "ReturnRejected is an option returning rejected projected-right records together with accepted records.";
 RejectZeroProjection::usage = "RejectZeroProjection is an option dropping records whose auxiliary projection to J vanishes.";
 RightSpins::usage = "RightSpins is an option specifying physical right-side spins for backend comparison helpers.";
-RightMass::usage = "RightMass is an option specifying the physical or auxiliary-construction mass convention for the right side.";
-LeftMass::usage = "LeftMass is an option specifying the two left heavy labels or mass vector.";
+RightMass::usage = "RightMass is an option specifying massive right-side particle labels. In ConstructProjectedSewingRelativeChiralBasis, Automatic means all right-side particles 3..n are massive; explicit lists may contain only labels >=3. The fixed-right-polarization expert constructors keep their historical Automatic default {3}.";
+LeftMass::usage = "LeftMass is a compatibility option for the two left labels. In the projected sewing constructor, particles 1 and 2 are always treated as massive.";
 JRange::usage = "JRange is an option specifying explicit left-current J values to scan. When JRange and JMax are both Automatic, sewing constructors use automatic J scanning.";
 JMax::usage = "JMax is an option specifying the maximum left-current J when JRange is Automatic. When JMax is Automatic too, sewing constructors use automatic J scanning with AutoJNoRightWindow and an internal hard cap.";
 SewingContractionMode::usage = "SewingContractionMode is an option for sewn-record construction. Use \"Split\" to keep individual symmetric contraction terms as separate records, or \"Sum\" to combine them into one record per left/right pair.";

@@ -92,6 +92,8 @@ ConstructGeneralSewingAmplitudeRecords::check =
   "Sewing construction check failed: `1`.";
 ConstructGeneralSewingAmplitudeRecords::mode =
   "Unsupported SewingContractionMode `1`. Use \"Split\" or \"Sum\".";
+ConstructGeneralSewingAmplitudeRecords::mass =
+  "Invalid right-side mass specification `1`. Use All, Automatic, or a list of massive right-side particle labels from 3 through `2`.";
 ConstructIndepSewingBlock::usage =
   "ConstructIndepSewingBlock[leftSpin, rightSpins, ampDim, rightPolarization, opts] returns `{basis, coefficientMatrix, reducedMonomialBasis}` for the independent sewn basis after fixed priority sorting by lower `J`, then higher `Xsoft`, then higher `Xhard`. With `CheckAgainstCF -> True`, the sewn span is validated against `ConstructIndepCFBlock`. With `ReturnRecords -> True`, it returns an association containing the selected records, amplitudes, matrix, monomials, and positions.";
 ConstructIndepSewingBlock::cfcheck =
@@ -100,6 +102,8 @@ ConstructIndepSewingBlock::indcheck =
   "Independent sewing block check failed: `1`.";
 ConstructIndepSewingBlock::records =
   "Sewing record construction failed.";
+ConstructIndepSewingBlock::mass =
+  "Invalid right-side mass specification `1`. Use All, Automatic, or a list of massive right-side particle labels from 3 through `2`.";
 SewingSortRecordsForBasis::sortdata =
   "Cannot sort sewing records because at least one record has missing or invalid SortData metadata.";
 SewingSortRecordsByChiralOrder::metadata =
@@ -149,6 +153,8 @@ ConstructRightProjectedJResidualRecords::check =
   "Projected right residual construction failed the J-shape filter: `1`.";
 CompareGeneralSewingToCFBlocks::cf =
   "CF comparison failed for spin sector `1`, codeDim `2`, polarization `3`, mass `4`.";
+CompareGeneralSewingToCFBlocks::mass =
+  "Invalid right-side mass specification `1`. Use All, Automatic, or a list of massive right-side particle labels from 3 through `2`.";
 ConstructSewingRelativeChiralBasis::cfcheck =
   "Sewing span is not complete against CF blocks. CF rank `1`, sewing rank `2`, joined rank `3`.";
 ConstructSewingRelativeChiralBasis::sort =
@@ -173,6 +179,8 @@ ConstructProjectedSewingRelativeChiralBasis::count =
   "Projected sewing count check failed: `1`.";
 ConstructProjectedSewingRelativeChiralBasis::polfilter =
   "Invalid RightPolarizationFilter `1`. Use All or an Association whose keys are right-side particle labels 3..`2` and whose values are All, an integer polarization, or a list of integer polarizations.";
+ConstructProjectedSewingRelativeChiralBasis::mass =
+  "Invalid right-side mass specification `1`. Use All, Automatic, or a list of massive right-side particle labels from 3 through `2`.";
 
 ClearAll[SewingPerformanceRecord, SewingPerformanceTimed];
 SewingPerformanceRecord[None, _String, _?NumericQ, _Association] := Null;
@@ -1379,47 +1387,37 @@ SewingAutoJSearchLimit[leftSpin_, ampDim_Integer, rightSpins_List] := Module[
 ];
 
 SewingDefaultRightMass[np_Integer?Positive] := If[np >= 3, {3}, {}];
-SewingMassLabelValue[i_Integer?Positive] :=
-  ToExpression["m" <> ToString[i]];
-SewingMassVectorFromPositions[positions_List, np_Integer?Positive] :=
-  Table[If[MemberQ[positions, i], SewingMassLabelValue[i], 0], {i, np}];
-SewingLeftMassVector[leftMassIn_] := Which[
-  leftMassIn === All,
-    SewingMassVectorFromPositions[{1, 2}, 2],
-  ListQ[leftMassIn] && And @@ ((IntegerQ[#] && 1 <= # <= 2) & /@ leftMassIn),
-    SewingMassVectorFromPositions[leftMassIn, 2],
-  True,
-    MassOption[leftMassIn, 2]
+SewingProjectedDefaultRightMass[_Integer?Positive] := All;
+SewingMassOptionPositions[masses_List] := Flatten[Position[masses, Except[0]]];
+SewingValidRightMassSpecQ[All, _Integer?Positive] := True;
+SewingValidRightMassSpecQ[Automatic, _Integer?Positive] := True;
+SewingValidRightMassSpecQ[rightMass_List, np_Integer?Positive] :=
+  And @@ ((IntegerQ[#] && 3 <= # <= np) & /@ rightMass);
+SewingFullMassParameter[rightMassIn_, np_Integer?Positive, automaticRightMass_ : All] := Module[{rightMass},
+  rightMass = Replace[rightMassIn, Automatic -> automaticRightMass];
+  Which[
+    rightMass === All,
+      Range[np],
+    SewingValidRightMassSpecQ[rightMass, np],
+      DeleteDuplicates[Join[{1, 2}, rightMass]],
+    True,
+      $Failed
+  ]
 ];
 
-SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List] := Module[
-  {np = 2 + Length[rightSpins], rightMass, rightPositionQ, rightVectorQ, leftVector, rightVector},
-  rightMass = Replace[rightMassIn, Automatic -> SewingDefaultRightMass[np]];
-  rightPositionQ = ListQ[rightMass] && And @@ ((IntegerQ[#] && 3 <= # <= np) & /@ rightMass);
-  rightVectorQ = ListQ[rightMass] && Length[rightMass] == Length[rightSpins] && ! rightPositionQ;
-  Which[
-    rightPositionQ,
-      leftVector = SewingLeftMassVector[leftMassIn];
-      rightVector = SewingMassVectorFromPositions[rightMass, np];
-      <|
-        "RightConstructMass" -> rightVector,
-        "FullMass" -> Join[leftVector, Drop[rightVector, 2]],
-        "PhysicalRightMass" -> rightMass
-      |>,
-    rightVectorQ,
-      leftVector = SewingLeftMassVector[leftMassIn];
-      <|
-        "RightConstructMass" -> Join[{0, 0}, rightMass],
-        "FullMass" -> Join[leftVector, rightMass],
-        "PhysicalRightMass" -> Flatten[Position[rightMass, Except[0]]] + 2
-      |>,
-    True,
-      <|
-        "RightConstructMass" -> rightMass,
-        "FullMass" -> Join[SewingLeftMassVector[leftMassIn], Drop[MassOption[rightMass, np], 2]],
-        "PhysicalRightMass" -> Flatten[Position[Drop[MassOption[rightMass, np], 2], Except[0]]] + 2
-      |>
-  ]
+SewingMassOptionData[leftMassIn_, rightMassIn_, rightSpins_List, automaticRightMass_ : All] := Module[
+  {np = 2 + Length[rightSpins], fullMassParameter, fullMass, physicalRightMass, rightConstructMass},
+  fullMassParameter = SewingFullMassParameter[rightMassIn, np, automaticRightMass];
+  If[fullMassParameter === $Failed, Return[$Failed]];
+  fullMass = MassOption[fullMassParameter, np];
+  physicalRightMass = Intersection[SewingMassOptionPositions[fullMass], Range[3, np]];
+  rightConstructMass = Join[ConstantArray[0, 2], Drop[fullMass, 2]];
+  <|
+    "FullMassParameter" -> fullMassParameter,
+    "FullMass" -> fullMass,
+    "RightConstructMass" -> rightConstructMass,
+    "PhysicalRightMass" -> physicalRightMass
+  |>
 ];
 
 Options[ConstructGeneralSewingAmplitudeRecords] = Join[
@@ -1488,7 +1486,16 @@ ConstructGeneralSewingAmplitudeRecords[
     Message[ConstructGeneralSewingAmplitudeRecords::args, npFull, Length[rightSpins], Length[rightPolarization]];
     Return[{}]
   ];
-  rightMassData = SewingMassOptionData[OptionValue[LeftMass], OptionValue[RightMass], rightSpins];
+  rightMassData = SewingMassOptionData[
+    OptionValue[LeftMass],
+    OptionValue[RightMass],
+    rightSpins,
+    SewingDefaultRightMass[npFull]
+  ];
+  If[rightMassData === $Failed,
+    Message[ConstructGeneralSewingAmplitudeRecords::mass, OptionValue[RightMass], npFull];
+    Return[$Failed]
+  ];
   rightMass = rightMassData["RightConstructMass"];
   jRangeOpt = OptionValue[JRange];
   jMaxOpt = OptionValue[JMax];
@@ -1990,7 +1997,16 @@ CompareGeneralSewingToCFBlocks[
   If[np < 4, Return[<|"Error" -> "Right side must contain at least two physical particles, so full n must be at least 4."|>]];
   codeDim = SewingCodeDimFromAmpDim[ampDim, np];
   leftMass = OptionValue[LeftMass];
-  rightMassData = SewingMassOptionData[leftMass, OptionValue[RightMass], rightSpins];
+  rightMassData = SewingMassOptionData[
+    leftMass,
+    OptionValue[RightMass],
+    rightSpins,
+    SewingDefaultRightMass[np]
+  ];
+  If[rightMassData === $Failed,
+    Message[CompareGeneralSewingToCFBlocks::mass, OptionValue[RightMass], np];
+    Return[$Failed]
+  ];
   rightMass = rightMassData["RightConstructMass"];
   fullMass = rightMassData["FullMass"];
   spins = Join[{leftSpin, leftSpin}, rightSpins];
@@ -2192,7 +2208,16 @@ ConstructIndepSewingBlock[
   If[TrueQ[OptionValue[FilterSewingByCFPolarization]],
     np = 2 + Length[rightSpins];
     leftMass = OptionValue[LeftMass];
-    rightMassData = SewingMassOptionData[leftMass, OptionValue[RightMass], rightSpins];
+    rightMassData = SewingMassOptionData[
+      leftMass,
+      OptionValue[RightMass],
+      rightSpins,
+      SewingDefaultRightMass[np]
+    ];
+    If[rightMassData === $Failed,
+      Message[ConstructIndepSewingBlock::mass, OptionValue[RightMass], np];
+      Return[$Failed]
+    ];
     fullMass = rightMassData["FullMass"];
     leftPolarRange = Replace[OptionValue[LeftPolarizationRange], Automatic -> Range[0, 2 leftSpin]];
     cfPolarizations = Replace[
@@ -2572,6 +2597,28 @@ ProjectSewingAmplitudeRecords[
     IdentityMatrix[Length[selectedRecords]],
     SewingTotalYoungOperator[lorentzOperatorDict, identicalInfo, identicalPolyDict]
   ];
+  If[Length[identicalInfo] > 0 && Length[lorentzYoungOperator] == 0,
+    Return[
+      <|
+        "CompleteQ" -> True,
+        "CFRank" -> MatrixRank[cfMatrix],
+        "SewingRank" -> sewingMatrixData["Rank"],
+        "JoinedRank" -> joinedMatrixData["Rank"],
+        "FullPolarization" -> fullPolarization,
+        "IdenticalInfo" -> identicalInfo,
+        "CFBlock" -> localCFBlock,
+        "CFBasis" -> cfBasis,
+        "RecordsBeforeIdentical" -> selectedRecords,
+        "Records" -> {},
+        "Matrix" -> selectedMatrix,
+        "LorentzOperatorDictionary" -> lorentzOperatorDict,
+        "IdenticalPolynomialDictionary" -> identicalPolyDict,
+        "LorentzYoungOperator" -> {},
+        "IndependentPositions" -> {},
+        "JBlockDiagnostics" -> <||>
+      |>
+    ]
+  ];
   independentPositions = If[Length[identicalInfo] == 0,
     Range[Length[selectedRecords]],
     SewingPerformanceTimed[
@@ -2663,7 +2710,7 @@ ConstructProjectedSewingRelativeChiralBasis[
     identicalInfo, sewingRecords, projection, colorData, totalOperator,
     directProductItems, projectedItems, independentPositions, colorOperatorDict,
     colorBasis, hasSU3, su3IndDict, totalIdenticalOperator, totalJDiagnostics,
-    sectorOutput, expectedDirectCount, outputCount, qSpec
+    sectorOutput, expectedDirectCount, outputCount, qSpec, blockAmpDim, finalQSpec
   },
   debug = TrueQ[OptionValue[SewingDebug]];
   traceEnabled = TrueQ[OptionValue[SewingPerformanceTrace]];
@@ -2691,7 +2738,20 @@ ConstructProjectedSewingRelativeChiralBasis[
   codeDim = SewingCodeDimFromAmpDim[ampDim, pointCount];
   leftMass = OptionValue[LeftMass];
   qSpec = OptionValue[QReplacement];
-  rightMassData = SewingMassOptionData[leftMass, OptionValue[RightMass], rightSpins];
+  rightMassData = SewingMassOptionData[
+    leftMass,
+    OptionValue[RightMass],
+    rightSpins,
+    SewingProjectedDefaultRightMass[pointCount]
+  ];
+  If[rightMassData === $Failed,
+    Message[
+      ConstructProjectedSewingRelativeChiralBasis::mass,
+      OptionValue[RightMass],
+      pointCount
+    ];
+    Return[$Failed]
+  ];
   fullMass = rightMassData["FullMass"];
   invalidIdenticals = Select[identicalParam, ! FreeQ[#, 1 | 2] &];
   If[invalidIdenticals =!= {},
@@ -2711,8 +2771,8 @@ ConstructProjectedSewingRelativeChiralBasis[
   candidateBlocks = SewingPerformanceTimed[
     traceRecord,
     "Projected.GenerateNeedCFBlocks",
-    GenerateNeedCFBlocks[spins, codeDim, mass -> fullMass],
-    <|"CodeDim" -> codeDim|>
+    GenerateNeedCFBlocks[spins, ampDim, mass -> fullMass],
+    <|"AmpDim" -> ampDim, "CodeDim" -> codeDim|>
   ];
   unfilteredPhysicalBlocks = SewingPerformanceTimed[
     traceRecord,
@@ -2767,18 +2827,21 @@ ConstructProjectedSewingRelativeChiralBasis[
       <|"J" -> j, "Scope" -> "Projected"|>
     ]
   ];
-  getRecordsForRightPolarization[rightPolarization_List] := If[
-    KeyExistsQ[recordsByRightPolarization, rightPolarization],
-    SewingPerformanceRecord[traceRecord, "Cache.RightPolarizationRecords", 0., <|"Cache" -> "Hit", "RightPolarization" -> rightPolarization|>];
-    recordsByRightPolarization[rightPolarization],
-    SewingPerformanceRecord[traceRecord, "Cache.RightPolarizationRecords", 0., <|"Cache" -> "Miss", "RightPolarization" -> rightPolarization|>];
-    recordsByRightPolarization[rightPolarization] = SewingPerformanceTimed[
+  getRecordsForRightPolarization[recordAmpDim_Integer?NonNegative, rightPolarization_List] := Module[
+    {cacheKey = {recordAmpDim, rightPolarization}},
+    If[
+    KeyExistsQ[recordsByRightPolarization, cacheKey],
+    SewingPerformanceRecord[traceRecord, "Cache.RightPolarizationRecords", 0., <|"Cache" -> "Hit", "AmpDim" -> recordAmpDim, "RightPolarization" -> rightPolarization|>];
+    Return[recordsByRightPolarization[cacheKey]]
+    ];
+    SewingPerformanceRecord[traceRecord, "Cache.RightPolarizationRecords", 0., <|"Cache" -> "Miss", "AmpDim" -> recordAmpDim, "RightPolarization" -> rightPolarization|>];
+    recordsByRightPolarization[cacheKey] = SewingPerformanceTimed[
       traceRecord,
       "Projected.GeneralSewingRecords",
       ConstructGeneralSewingAmplitudeRecords[
       leftSpin,
       rightSpins,
-      ampDim,
+      recordAmpDim,
       rightPolarization,
       Sequence @@ Join[
         FilterRules[
@@ -2795,24 +2858,25 @@ ConstructProjectedSewingRelativeChiralBasis[
         }
       ]
       ],
-      <|"RightPolarization" -> rightPolarization|>
+      <|"AmpDim" -> recordAmpDim, "RightPolarization" -> rightPolarization|>
     ];
-    If[recordsByRightPolarization[rightPolarization] =!= $Failed && ListQ[recordsByRightPolarization[rightPolarization]],
-      recordsByRightPolarization[rightPolarization] = SewingPerformanceTimed[
+    If[recordsByRightPolarization[cacheKey] =!= $Failed && ListQ[recordsByRightPolarization[cacheKey]],
+      recordsByRightPolarization[cacheKey] = SewingPerformanceTimed[
         traceRecord,
         "Projected.AttachPhysicalPolarizationData",
         SewingAttachPhysicalPolarizationData[
-          recordsByRightPolarization[rightPolarization],
+          recordsByRightPolarization[cacheKey],
           pointCount,
           fullMass
         ],
         <|
+          "AmpDim" -> recordAmpDim,
           "RightPolarization" -> rightPolarization,
-          "RecordCount" -> Length[recordsByRightPolarization[rightPolarization]]
+          "RecordCount" -> Length[recordsByRightPolarization[cacheKey]]
         |>
       ]
     ];
-    recordsByRightPolarization[rightPolarization]
+    recordsByRightPolarization[cacheKey]
   ];
   getColorData[info_List] := If[
     KeyExistsQ[colorCache, info],
@@ -2830,6 +2894,7 @@ ConstructProjectedSewingRelativeChiralBasis[
     Do[
       fullPolarization = block[[2]];
       rightPolarization = fullPolarization[[3 ;;]];
+      blockAmpDim = block[[1]] - pointCount;
       identicalInfo = Quiet@Check[ReAssignIdentical[fullPolarization, identicalTypeList], {}];
       localCFBlock = SewingPerformanceTimed[
         traceRecord,
@@ -2843,7 +2908,7 @@ ConstructProjectedSewingRelativeChiralBasis[
       If[! ListQ[localCFBlock] || Length[localCFBlock] < 3 || Length[localCFBlock[[1]]] == 0,
         Continue[]
       ];
-      sewingRecords = getRecordsForRightPolarization[rightPolarization];
+      sewingRecords = getRecordsForRightPolarization[blockAmpDim, rightPolarization];
       If[sewingRecords === $Failed,
         Message[ConstructProjectedSewingRelativeChiralBasis::sewing, fullPolarization];
         Return[$Failed]
@@ -2883,6 +2948,26 @@ ConstructProjectedSewingRelativeChiralBasis[
         colorBasis,
         su3IndDict,
         hasSU3
+      ];
+      If[Length[directProductItems] == 0,
+        sectorOutput = Join[
+          projection,
+          <|
+            "Block" -> block,
+            "RightPolarization" -> rightPolarization,
+            "ColorData" -> colorData,
+            "DirectProductItemsBeforeProjection" -> {},
+            "ProjectedItems" -> {},
+            "TotalYoungOperator" -> {},
+            "DirectProductIndependentPositions" -> {},
+            "TotalJBlockDiagnostics" -> <|
+              "PtotalBlockDiagonalByJ" -> True,
+              "TotalYoungOperatorBlockDiagonalByJ" -> True
+            |>
+          |>
+        ];
+        Sow[sectorOutput];
+        Continue[]
       ];
       If[Length[identicalInfo] == 0 || ! TrueQ[hasSU3],
         independentPositions = Range[Length[directProductItems]];
@@ -2942,10 +3027,11 @@ ConstructProjectedSewingRelativeChiralBasis[
   groupedBasis = SewingPerformanceTimed[
     traceRecord,
     "Projected.GroupByRelativeChiralOrder",
+    finalQSpec = Replace[OptionValue[ReplaceQInFinalSymbolForm], True -> OptionValue[QReplacement]];
     SewingGroupProjectedItemsByChiralOrder[
       allProjectedItems,
-      OptionValue[ReplaceQInFinalSymbolForm],
-      OptionValue[QReplacement]
+      OptionValue[ReplaceQInFinalSymbolForm] =!= False,
+      finalQSpec
     ],
     <|"ProjectedItemCount" -> Length[allProjectedItems]|>
   ];

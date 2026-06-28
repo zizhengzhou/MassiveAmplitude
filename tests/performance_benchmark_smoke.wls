@@ -13,11 +13,10 @@ fullMassFromCase[leftSpin_, rightSpins_List, rightMass_List] := Join[
   Table[If[MemberQ[rightMass, i], ToExpression["m" <> ToString[i]], 0], {i, 3, 2 + Length[rightSpins]}]
 ];
 legacyCount[leftSpin_, rightSpins_List, rightMass_List, ampDim_Integer, identical_List] := Module[
-  {spins = Join[{leftSpin, leftSpin}, rightSpins], fullMass, codeDim, basis},
+  {spins = Join[{leftSpin, leftSpin}, rightSpins], fullMass, basis},
   fullMass = fullMassFromCase[leftSpin, rightSpins, rightMass];
-  codeDim = ampDim + Length[spins];
   basis = Quiet@Check[
-    Block[{Print = (Null &)}, MassiveBasis`Private`ConstructGeneralBasis[spins, codeDim, identical, mass -> fullMass]],
+    Block[{Print = (Null &)}, MassiveBasis`Private`ConstructGeneralBasis[spins, ampDim, identical, mass -> fullMass]],
     $Failed
   ];
   If[ListQ[basis], Length[basis], $Failed]

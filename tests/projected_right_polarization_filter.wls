@@ -1,6 +1,6 @@
 Get[FileNameJoin[{"src", "Package", "Kernel", "init.m"}]];
 
-ClearAll[fail, totalCount, fullPolarizations];
+ClearAll[fail, totalCount, fullPolarizations, fullMassFromLabels, legacyCount];
 
 fail[msg_, data_: None] := (
   Print[msg, If[data === None, "", ": " <> ToString[data, InputForm]]];
@@ -9,6 +9,18 @@ fail[msg_, data_: None] := (
 
 totalCount[assoc_Association] := Total[Length /@ Values[assoc]];
 fullPolarizations[data_Association, key_String] := data[key][[All, 2]];
+fullMassFromLabels[np_Integer?Positive, labels_List] := MassOption[Join[{1, 2}, labels], np];
+legacyCount[leftSpin_, rightSpins_List, rightMass_List, ampDim_Integer, identical_List] := Module[
+  {spins = Join[{leftSpin, leftSpin}, rightSpins], fullMass, basis},
+  fullMass = fullMassFromLabels[2 + Length[rightSpins], rightMass];
+  basis = Quiet @ Check[
+    Block[{Print = (Null &)},
+      MassiveBasis`Private`ConstructGeneralBasis[spins, ampDim, identical, mass -> fullMass]
+    ],
+    $Failed
+  ];
+  If[ListQ[basis], Length[basis], $Failed]
+];
 
 plain = ConstructProjectedSewingRelativeChiralBasis[
   1/2,
@@ -62,8 +74,14 @@ If[! AssociationQ[plain] || ! AssociationQ[filtered] || ! AssociationQ[multiFilt
   fail["right polarization filter cases should return projection data"]
 ];
 
-If[totalCount[plain["BasisByRelativeChiralOrder"]] =!= 8,
-  fail["baseline target example should have the documented ampDim=4 count", plain["BasisByRelativeChiralOrder"]]
+baselineLegacyCount = legacyCount[1/2, {1, 1, 0}, {3, 4}, 4, {{3, 4}}];
+If[
+  ! IntegerQ[baselineLegacyCount] ||
+    totalCount[plain["BasisByRelativeChiralOrder"]] =!= baselineLegacyCount,
+  fail[
+    "baseline target example should match ConstructGeneralBasis count at the same ampDim",
+    <|"Projected" -> plain["BasisByRelativeChiralOrder"], "LegacyCount" -> baselineLegacyCount|>
+  ]
 ];
 
 If[! AllTrue[fullPolarizations[filtered, "PhysicalBlocks"], #[[3]] == 2 &],

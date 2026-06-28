@@ -47,7 +47,10 @@ publicSymbols = {
   SewingOutputForm,
   ReturnProjectionData,
   SewingPerformanceTrace,
-  RightPolarizationFilter
+  RightPolarizationFilter,
+  Q,
+  Xhard,
+  Xsoft
 };
 
 missingUsage = Select[
@@ -66,9 +69,12 @@ messageSymbols = {
   ConstructGeneralSewingAmplitudeRecords::ampdim,
   ConstructGeneralSewingAmplitudeRecords::check,
   ConstructGeneralSewingAmplitudeRecords::mode,
+  ConstructGeneralSewingAmplitudeRecords::mass,
   ConstructIndepSewingBlock::cfcheck,
   ConstructIndepSewingBlock::indcheck,
   ConstructIndepSewingBlock::records,
+  ConstructIndepSewingBlock::mass,
+  CompareGeneralSewingToCFBlocks::mass,
   ConstructSewingRelativeChiralBasis::cfcheck,
   ConstructSewingRelativeChiralBasis::sort,
   ConstructSewingRelativeChiralBasis::count,
@@ -128,6 +134,18 @@ requiredUsageFragments = {
     "Association",
     "right-side particle labels",
     "All"
+  },
+  Q -> {
+    "formal momentum label",
+    "QReplacement"
+  },
+  Xhard -> {
+    "formal symbolic factor",
+    "hard/static"
+  },
+  Xsoft -> {
+    "formal symbolic factor",
+    "soft/recoil"
   }
 };
 

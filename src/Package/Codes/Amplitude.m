@@ -17,14 +17,14 @@ ReduceSt::usage =
   "ReduceSt[amp, n] reduces an amplitude using Schouten and momentum-conservation identities for n external particles. ReduceSt[n] returns the corresponding operator form.";
 ConstructCFIByFakeDim::usage =
   "ConstructCFIByFakeDim[spins, fakeDim, opts] constructs current-factorization data at a fake dimension used by the legacy independent-basis pipeline.";
+MassOption[massiveParticles_List, np_] /; And @@ ((IntegerQ@# && # >= 1 && # <= np)& /@ massiveParticles) := Table[
+  If[!MemberQ[DeleteDuplicates[massiveParticles], i], 0, "\!\(\*SubscriptBox[\(m\), \(" <> ToString@i <> "\)]\)"],
+  {i, np}];
 MassOption[masses_List, np_] :=
     If[np > Length@masses,
       masses ~ Join ~ ConstantArray[0, np - Length@masses],
       masses[[1 ;; np]]
     ];
-MassOption[massiveParticles_List, np_] /; And @@ ((IntegerQ@# && # >= 1 && # <= np)& /@ massiveParticles) := Table[
-  If[!MemberQ[massiveParticles, i], 0, "\!\(\*SubscriptBox[\(m\), \(" <> ToString@i <> "\)]\)"],
-  {i, np}];
 MassOption[All, np_] := Table["\!\(\*SubscriptBox[\(m\), \(" <> ToString@i <> "\)]\)", {i, np}];
 
 (* ::Section:: *)
