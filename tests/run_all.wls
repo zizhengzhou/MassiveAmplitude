@@ -17,6 +17,9 @@ scripts = {
   "sewing_relative_chiral_basis_interface.wls",
   "projected_sewing_probe.wls",
   "projected_sewing_su3_probe.wls",
+  "projected_identical_six_point_regression.wls",
+  "projected_performance_trace_smoke.wls",
+  "performance_benchmark_smoke.wls",
   "section_5_2_bbuf_reproduce.wls",
   "section_5_2_split_sum_independent_counts.wls",
   "section_5_2_chiral_order_reproduce.wls"

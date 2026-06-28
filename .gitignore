@@ -8,4 +8,4 @@ Thumbs.db
 *.log.tmp
 .tmp*/
 __tmp*
-
+logs/*_latest.wl
