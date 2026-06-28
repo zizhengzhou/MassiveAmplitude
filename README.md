@@ -100,6 +100,20 @@ ConstructProjectedSewingRelativeChiralBasis[
 ]
 ```
 
+Restrict right-side polarization sectors after identical-sector representative
+selection and before Young projection:
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  1/2,
+  {1, 1, 0},
+  {3, 4},
+  4,
+  {{3, 4}},
+  RightPolarizationFilter -> <|3 -> 2|>
+]
+```
+
 ## Current Method
 
 For an \(n\)-point amplitude, the constructor uses this workflow:

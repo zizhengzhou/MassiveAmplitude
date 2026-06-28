@@ -46,7 +46,8 @@ publicSymbols = {
   ReplaceQInFinalSymbolForm,
   SewingOutputForm,
   ReturnProjectionData,
-  SewingPerformanceTrace
+  SewingPerformanceTrace,
+  RightPolarizationFilter
 };
 
 missingUsage = Select[
@@ -79,6 +80,7 @@ messageSymbols = {
   ConstructProjectedSewingRelativeChiralBasis::complete,
   ConstructProjectedSewingRelativeChiralBasis::su3,
   ConstructProjectedSewingRelativeChiralBasis::count,
+  ConstructProjectedSewingRelativeChiralBasis::polfilter,
   SewingSymbolToAmpForm::badq,
   SewingReplaceQInSymbolForm::badq,
   SewingSortRecordsForBasis::sortdata,
@@ -102,7 +104,8 @@ requiredUsageFragments = {
     "BasisByRelativeChiralOrder",
     "SU3IndexDictionary",
     "DirectProduct",
-    "FindIndependentBasisPos"
+    "FindIndependentBasisPos",
+    "RightPolarizationFilter"
   },
   ProjectSewingAmplitudeRecords -> {
     "full polarization",
@@ -120,6 +123,11 @@ requiredUsageFragments = {
     "per-stage timing",
     "cache hit/miss",
     "ReturnProjectionData"
+  },
+  RightPolarizationFilter -> {
+    "Association",
+    "right-side particle labels",
+    "All"
   }
 };
 

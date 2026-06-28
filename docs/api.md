@@ -40,6 +40,12 @@ Important options:
 
 * `su3ShapeList`: SU(3) shape labels for all particles, for example
   `{"", "", "q", "aq"}`.
+* `RightPolarizationFilter`: default `All`.  Use an association such as
+  `<|3 -> 1, 5 -> {0, 2}|>` to keep only full-polarization sectors where the
+  listed right-side particle labels have allowed polarizations.  Keys must be
+  right-side labels `3,4,...`; values may be one integer, a list of integers,
+  or `All`.  When `identicalParam` is nonempty, this filter is applied after
+  the standard identical-sector representative selection.
 * `QReplacement`: default `{1, -2}`, meaning \(Q=p_1-p_2\).
 * `ReplaceQInFinalSymbolForm`: default `True`.
 * `ReturnProjectionData`: default `False`.
@@ -64,7 +70,9 @@ Detailed output with `ReturnProjectionData -> True`:
   "Mass" -> ...,
   "IdenticalTypeList" -> ...,
   "CandidateBlocks" -> ...,
+  "UnfilteredPhysicalBlocks" -> ...,
   "PhysicalBlocks" -> ...,
+  "RightPolarizationFilter" -> ...,
   "SU3ShapeList" -> ...,
   "SU3IndexDictionaries" -> ...
 |>

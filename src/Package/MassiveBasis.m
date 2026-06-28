@@ -40,7 +40,8 @@ Print["Loading MassiveBasis..."];
   CheckSewing, CheckVerbose, FilterPhysicalSector, FilterByAmpDim,
   DeduplicateByReducedAmp, LeftPolarizationRange, CFPolarizations,
   FilterSewingByCFPolarization, CheckAgainstCF, SewingDebug, SewingOutputForm, ReturnRecords,
-  AutoJNoRightWindow, ReplaceQInFinalSymbolForm, ReturnProjectionData, SewingPerformanceTrace
+  AutoJNoRightWindow, ReplaceQInFinalSymbolForm, ReturnProjectionData, SewingPerformanceTrace,
+  RightPolarizationFilter
 };
 {$MassiveVerbose, $SewingDebug, SewingLog};
 
@@ -151,6 +152,7 @@ AutoJNoRightWindow::usage = "AutoJNoRightWindow is an option specifying how many
 ReplaceQInFinalSymbolForm::usage = "ReplaceQInFinalSymbolForm is an option for ConstructSewingRelativeChiralBasis. When True, final symbolic output replaces Q by QReplacement while preserving Xhard and Xsoft.";
 ReturnProjectionData::usage = "ReturnProjectionData is an option for projected sewing constructors. When True, ConstructProjectedSewingRelativeChiralBasis returns an association containing BasisByRelativeChiralOrder plus detailed sector records, CF/sewing ranks, Lorentz and total Young operators, SU3IndexDictionaries, and J block diagnostics. The default False returns only the grouped basis.";
 SewingPerformanceTrace::usage = "SewingPerformanceTrace is an option for projected sewing constructors. The default False disables timing data. Set SewingPerformanceTrace -> True together with ReturnProjectionData -> True to include per-stage timing and cache hit/miss counters in the returned association.";
+RightPolarizationFilter::usage = "RightPolarizationFilter is an option for ConstructProjectedSewingRelativeChiralBasis. The default All keeps all right-side full-polarization sectors. Use an Association such as <|3 -> 1, 5 -> {0, 2}|> to keep only sectors whose particle-label polarizations match the allowed integer values; association keys must be right-side particle labels 3,4,... .";
 
 If[!Global`$DEBUG, Begin["`Private`"]];
 

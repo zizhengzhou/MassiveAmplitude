@@ -38,6 +38,7 @@ ClearAll[
   ConstructSewingRelativeChiralBasis,
   SewingIdenticalTypeList, SewingMatrixBlockDiagonalByJQ, SewingTotalYoungOperator,
   SewingColorDataForIdenticalInfo, SewingDirectProductBasisItems, SewingGroupProjectedItemsByChiralOrder,
+  SewingNormalizeRightPolarizationFilter, SewingRightPolarizationAllowedQ, SewingFilterCFBlocksByRightPolarization,
   ProjectSewingAmplitudeRecords, ConstructProjectedSewingRelativeChiralBasis
 ];
 
@@ -134,7 +135,9 @@ ConstructSewingRelativeChiralBasis::usage =
 ProjectSewingAmplitudeRecords::usage =
   "ProjectSewingAmplitudeRecords[records, fullPolarization, identicalInfo, localCFBlock, opts] computes the Lorentz part of the identical-particle Young projection for one fixed full polarization sector. `records` must be sewing records carrying `SewingAmpForm`, `SewingSymForm`, `ReducedAmp`, `PointCount`, and full `Mass` metadata. `localCFBlock` must be the matching ConstructIndepCFBlock result {cfAmplitudes, cfCoefficientMatrix, cfMonomialBasis}. The function first verifies local CF/sewing span equality, then computes permutation matrices from internal amp forms, selects independent Young-projected Lorentz records with FindIndependentBasisPos, and returns an association containing `Records`, `RecordsBeforeIdentical`, `LorentzOperatorDictionary`, `LorentzYoungOperator`, `IndependentPositions`, ranks, and J block diagnostics. SewingDebug -> True prints default-off diagnostics.";
 ConstructProjectedSewingRelativeChiralBasis::usage =
-  "ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, identicalParam, opts] constructs the projected independent sewing basis for an equal-spin heavy pair and right-side particles. It enumerates the physically inequivalent full polarization sectors using GenerateNeedCFBlocks and FilterCFBlocksByIdentical, verifies each nonzero sector against the matching ConstructIndepCFBlock span, applies right-side identical-particle Young projection, and optionally attaches SU(3) color structures through a Lorentz/color direct product. Independent representatives after Lorentz/color projection are selected with FindIndependentBasisPos. The default output is an association `relativeChiralOrder -> symbolicBasisList`; without SU(3) the entries are symbolic Lorentz forms, while with su3ShapeList the entries are associations containing `LorentzSymbolForm`, `SU3Basis`, `SU3IndexDictionary`, and `DirectProduct`. ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, identicalParam, opts] specifies right-side massive labels explicitly. Main options include RightMass, LeftMass, su3ShapeList, QReplacement, ReplaceQInFinalSymbolForm, ReturnProjectionData, and SewingDebug. With ReturnProjectionData -> True the return value is an association with `BasisByRelativeChiralOrder`, `SectorResults`, `Spins`, `Mass`, `IdenticalTypeList`, `PhysicalBlocks`, `SU3ShapeList`, and `SU3IndexDictionaries`.";
+  "ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, ampDim, identicalParam, opts] constructs the projected independent sewing basis for an equal-spin heavy pair and right-side particles. It enumerates the physically inequivalent full polarization sectors using GenerateNeedCFBlocks and FilterCFBlocksByIdentical, verifies each nonzero sector against the matching ConstructIndepCFBlock span, applies right-side identical-particle Young projection, and optionally attaches SU(3) color structures through a Lorentz/color direct product. Independent representatives after Lorentz/color projection are selected with FindIndependentBasisPos. The default output is an association `relativeChiralOrder -> symbolicBasisList`; without SU(3) the entries are symbolic Lorentz forms, while with su3ShapeList the entries are associations containing `LorentzSymbolForm`, `SU3Basis`, `SU3IndexDictionary`, and `DirectProduct`. ConstructProjectedSewingRelativeChiralBasis[leftSpin, rightSpins, rightMass, ampDim, identicalParam, opts] specifies right-side massive labels explicitly. Main options include RightMass, LeftMass, su3ShapeList, QReplacement, RightPolarizationFilter, ReplaceQInFinalSymbolForm, ReturnProjectionData, and SewingDebug. RightPolarizationFilter -> All keeps all right-side sectors; an association such as <|3 -> 1, 5 -> {0, 2}|> keeps only identical-representative sectors with allowed polarizations at those right-side particle labels. With ReturnProjectionData -> True the return value is an association with `BasisByRelativeChiralOrder`, `SectorResults`, `Spins`, `Mass`, `IdenticalTypeList`, `CandidateBlocks`, `UnfilteredPhysicalBlocks`, `PhysicalBlocks`, `RightPolarizationFilter`, `SU3ShapeList`, and `SU3IndexDictionaries`.";
+RightPolarizationFilter::usage =
+  "RightPolarizationFilter is an option for ConstructProjectedSewingRelativeChiralBasis. The default All keeps all right-side full-polarization sectors. Use an Association such as <|3 -> 1, 5 -> {0, 2}|> to keep only sectors whose particle-label polarizations match the allowed integer values; association keys must be right-side particle labels 3,4,... .";
 SewingPerformanceTrace::usage =
   "SewingPerformanceTrace is an option for projected sewing constructors. The default False disables timing data. Set SewingPerformanceTrace -> True together with ReturnProjectionData -> True to include per-stage timing and cache hit/miss counters in the returned association.";
 SewingLeftRecordProvider::usage =
@@ -168,6 +171,8 @@ ConstructProjectedSewingRelativeChiralBasis::su3 =
   "SU(3) color basis construction failed for identical data `1` and su3ShapeList `2`. Check that identical particles carry compatible SU(3) shapes.";
 ConstructProjectedSewingRelativeChiralBasis::count =
   "Projected sewing count check failed: `1`.";
+ConstructProjectedSewingRelativeChiralBasis::polfilter =
+  "Invalid RightPolarizationFilter `1`. Use All or an Association whose keys are right-side particle labels 3..`2` and whose values are All, an integer polarization, or a list of integer polarizations.";
 
 ClearAll[SewingPerformanceRecord, SewingPerformanceTimed];
 SewingPerformanceRecord[None, _String, _?NumericQ, _Association] := Null;
@@ -2416,6 +2421,50 @@ SewingGroupProjectedItemsByChiralOrder[items_List, replaceQ_, qSpec_] := Module[
   ]
 ];
 
+SewingNormalizeRightPolarizationFilter::usage =
+  "SewingNormalizeRightPolarizationFilter[filter, np] normalizes a right-side polarization filter to an association label -> allowed-values, or returns $Failed for invalid input. It is an internal helper for ConstructProjectedSewingRelativeChiralBasis.";
+SewingRightPolarizationAllowedQ::usage =
+  "SewingRightPolarizationAllowedQ[fullPolarization, filter] returns True if a full-polarization sector satisfies a normalized right-side polarization filter.";
+SewingFilterCFBlocksByRightPolarization::usage =
+  "SewingFilterCFBlocksByRightPolarization[blocks, filter] keeps only CF block descriptors whose full-polarization sector satisfies the normalized right-side polarization filter.";
+
+SewingNormalizeRightPolarizationFilter[All, _Integer?Positive] := All;
+SewingNormalizeRightPolarizationFilter[filter_Association, np_Integer?Positive] := Module[
+  {normalizeValue, pairs},
+  normalizeValue[All] := All;
+  normalizeValue[value_Integer] := {value};
+  normalizeValue[values_List] /; AllTrue[values, IntegerQ] := DeleteDuplicates[values];
+  normalizeValue[_] := $Failed;
+  pairs = KeyValueMap[
+    Function[{label, value},
+      If[! IntegerQ[label] || label < 3 || label > np,
+        Return[$Failed, Module]
+      ];
+      With[{normalizedValue = normalizeValue[value]},
+        If[normalizedValue === $Failed,
+          Return[$Failed, Module]
+        ];
+        label -> normalizedValue
+      ]
+    ],
+    filter
+  ];
+  Association[pairs]
+];
+SewingNormalizeRightPolarizationFilter[_, _Integer?Positive] := $Failed;
+
+SewingRightPolarizationAllowedQ[_List, All] := True;
+SewingRightPolarizationAllowedQ[fullPolarization_List, filter_Association] := AllTrue[
+  Normal[filter],
+  Function[rule,
+    rule[[2]] === All || MemberQ[rule[[2]], fullPolarization[[rule[[1]]]]]
+  ]
+];
+
+SewingFilterCFBlocksByRightPolarization[blocks_List, All] := blocks;
+SewingFilterCFBlocksByRightPolarization[blocks_List, filter_Association] :=
+  Select[blocks, SewingRightPolarizationAllowedQ[#[[2]], filter] &];
+
 Options[ProjectSewingAmplitudeRecords] = {
   SewingDebug -> False,
   SewingPerformanceTrace -> False
@@ -2574,6 +2623,7 @@ Options[ConstructProjectedSewingRelativeChiralBasis] = Join[
     RightMass -> Automatic,
     LeftMass -> {1, 2},
     su3ShapeList -> {},
+    RightPolarizationFilter -> All,
     ReturnProjectionData -> False,
     ReplaceQInFinalSymbolForm -> True,
     SewingDebug -> False,
@@ -2606,7 +2656,7 @@ ConstructProjectedSewingRelativeChiralBasis[
 ] := Module[
   {
     debug, traceEnabled, traceEvents = {}, traceRecord, traceSummary, pointCount, spins, codeDim, leftMass, rightMassData, fullMass,
-    invalidIdenticals, identicalTypeList, candidateBlocks, physicalBlocks,
+    invalidIdenticals, identicalTypeList, rightPolarizationFilter, candidateBlocks, unfilteredPhysicalBlocks, physicalBlocks,
     recordsByRightPolarization = <||>, leftRecordsCache = <||>, colorCache = <||>, sectorResults,
     projectedItemGroups, allProjectedItems, groupedBasis, getLeftRecordsForJ, getRecordsForRightPolarization,
     getColorData, fullPolarization, rightPolarization, localCFBlock,
@@ -2649,22 +2699,44 @@ ConstructProjectedSewingRelativeChiralBasis[
     Return[$Failed]
   ];
   identicalTypeList = SewingIdenticalTypeList[spins, identicalParam];
+  rightPolarizationFilter = SewingNormalizeRightPolarizationFilter[OptionValue[RightPolarizationFilter], pointCount];
+  If[rightPolarizationFilter === $Failed,
+    Message[
+      ConstructProjectedSewingRelativeChiralBasis::polfilter,
+      OptionValue[RightPolarizationFilter],
+      pointCount
+    ];
+    Return[$Failed]
+  ];
   candidateBlocks = SewingPerformanceTimed[
     traceRecord,
     "Projected.GenerateNeedCFBlocks",
     GenerateNeedCFBlocks[spins, codeDim, mass -> fullMass],
     <|"CodeDim" -> codeDim|>
   ];
-  physicalBlocks = SewingPerformanceTimed[
+  unfilteredPhysicalBlocks = SewingPerformanceTimed[
     traceRecord,
     "Projected.FilterCFBlocksByIdentical",
     FilterCFBlocksByIdentical[candidateBlocks, identicalParam],
     <|"CandidateBlockCount" -> Length[candidateBlocks], "IdenticalParam" -> identicalParam|>
   ];
+  physicalBlocks = SewingPerformanceTimed[
+    traceRecord,
+    "Projected.RightPolarizationFilter",
+    SewingFilterCFBlocksByRightPolarization[unfilteredPhysicalBlocks, rightPolarizationFilter],
+    <|
+      "PhysicalBlockCount" -> Length[unfilteredPhysicalBlocks],
+      "RightPolarizationFilter" -> rightPolarizationFilter
+    |>
+  ];
   SewingLog[
     debug,
     "Projected.Blocks",
-    <|"CandidateBlocks" -> Length[candidateBlocks], "PhysicalBlocks" -> Length[physicalBlocks]|>
+    <|
+      "CandidateBlocks" -> Length[candidateBlocks],
+      "UnfilteredPhysicalBlocks" -> Length[unfilteredPhysicalBlocks],
+      "PhysicalBlocks" -> Length[physicalBlocks]
+    |>
   ];
   getLeftRecordsForJ[j_Integer?NonNegative] := Module[{cacheKey},
     cacheKey = {j, leftSpin, pointCount, qSpec};
@@ -2904,7 +2976,9 @@ ConstructProjectedSewingRelativeChiralBasis[
       "Mass" -> fullMass,
       "IdenticalTypeList" -> identicalTypeList,
       "CandidateBlocks" -> candidateBlocks,
+      "UnfilteredPhysicalBlocks" -> unfilteredPhysicalBlocks,
       "PhysicalBlocks" -> physicalBlocks,
+      "RightPolarizationFilter" -> rightPolarizationFilter,
       "SU3ShapeList" -> OptionValue[su3ShapeList],
       "SU3IndexDictionaries" -> DeleteDuplicates[Lookup[Lookup[sectorResults, "ColorData", {}], "SU3IndexDictionary", <||>]],
       "PerformanceTrace" -> If[traceEnabled, traceEvents, {}],
