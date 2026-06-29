@@ -24,6 +24,7 @@ scripts = {
   "projected_identical_six_point_regression.wls",
   "projected_performance_trace_smoke.wls",
   "performance_benchmark_smoke.wls",
+  "bbuf_right_residual_no_q_regression.wls",
   "section_5_2_bbuf_reproduce.wls",
   "section_5_2_split_sum_independent_counts.wls",
   "section_5_2_chiral_order_reproduce.wls"

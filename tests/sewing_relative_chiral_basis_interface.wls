@@ -34,8 +34,8 @@ If[totalCount[result] =!= 3,
 If[Length[result[2]] =!= 2 || Length[result[3]] =!= 1,
   fail["ampDim=4 interface should reproduce the expected relative-order split", result]
 ];
-If[! AnyTrue[Flatten[Values[result]], displaySymbolQ] || AnyTrue[Flatten[Values[result]], qSymbolQ],
-  fail["relative chiral basis should preserve Xhard/Xsoft but replace Q in final output by default", result]
+If[AnyTrue[Flatten[Values[result]], qSymbolQ],
+  fail["relative chiral basis should replace Q in final output by default", result]
 ];
 
 qResult = ConstructSewingRelativeChiralBasis[

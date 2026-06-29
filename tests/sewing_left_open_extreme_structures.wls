@@ -15,7 +15,7 @@ leftJ1 = ConstructLeft3PointOpenBasis[
 ];
 
 If[Length[leftJ1] =!= 4,
-  fail["spin-1/2 J=1 left three-point basis should keep all four open structures", Length[leftJ1]]
+  fail["spin-1/2 J=1 left three-point basis should keep all four open structures from a,b=0..m", Length[leftJ1]]
 ];
 
 If[! AnyTrue[leftJ1, #["OpenPowers"] === <|"Angle1" -> 0, "Square1" -> 1, "Angle2" -> 0, "Square2" -> 1|> &],
@@ -24,6 +24,14 @@ If[! AnyTrue[leftJ1, #["OpenPowers"] === <|"Angle1" -> 0, "Square1" -> 1, "Angle
 
 If[! AnyTrue[leftJ1, #["OpenPowers"] === <|"Angle1" -> 1, "Square1" -> 0, "Angle2" -> 1, "Square2" -> 0|> &],
   fail["spin-1/2 J=1 left three-point basis is missing the pure-angle <1J><2J> structure"]
+];
+
+If[! AnyTrue[leftJ1, #["OpenPowers"] === <|"Angle1" -> 1, "Square1" -> 0, "Angle2" -> 0, "Square2" -> 1|> &],
+  fail["spin-1/2 J=1 left three-point basis is missing the mixed <1J>[2'J] structure"]
+];
+
+If[! AnyTrue[leftJ1, #["OpenPowers"] === <|"Angle1" -> 0, "Square1" -> 1, "Angle2" -> 1, "Square2" -> 0|> &],
+  fail["spin-1/2 J=1 left three-point basis is missing the reverse mixed [1'J]<2J> structure"]
 ];
 
 ClearCache[];

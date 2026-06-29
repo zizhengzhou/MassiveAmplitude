@@ -5,7 +5,6 @@ LogPri["Sewing Loaded"];
 ClearAll[
   SewingJFactorQ, SewingJCounts, SewingCountsMatchQ,
   SewingClosedPairMonomials, SewingOpenPairMonomials,
-  SewingBalancedOpenPairQ,
   ConstructLeft3PointOpenBasis,
   SewingQLabelQ, SewingXSymbolQ, SewingContainsXSymbolQ, SewingDisplayForm,
   SewingQSingleFactor, SewingApplyLeftQReplacement, SewingSymbolToAmpForm, SewingReplaceQInSymbolForm,
@@ -63,7 +62,7 @@ CompareRightResidualBackends::usage =
 SewingAuxiliaryAmpToFormalJ::usage =
   "SewingAuxiliaryAmpToFormalJ[amp] filters and translates an auxiliary on-shell amplitude to the formal-J right-half amplitude.";
 SewingAuxiliaryAmpToFormalJCandidates::usage =
-  "SewingAuxiliaryAmpToFormalJCandidates[amp] returns all formal-J right-half amplitudes obtained by keeping each single auxiliary label as a supplemental left label or replacing it by J.";
+  "SewingAuxiliaryAmpToFormalJCandidates[amp] returns formal-J right-half amplitudes obtained by replacing temporary auxiliary labels by J. The right residual never introduces formal Q and never keeps auxiliary labels as physical legs.";
 SewingProjectAuxiliaryLabels::usage =
   "SewingProjectAuxiliaryLabels[amp, auxLabels, jLabel] replaces the two auxiliary labels in amp by the formal current label jLabel and removes self-contractions. The default is SewingProjectAuxiliaryLabels[amp, {1, 2}, J].";
 SewingNormalizeJTarget::usage =
@@ -533,25 +532,9 @@ SewingAuxiliaryAmpToFormalJCandidates[amp_, OptionsPattern[]] := Module[
   {auxLabels, jLabel, translateTerm, terms},
   auxLabels = OptionValue[AuxiliaryLabels];
   jLabel = OptionValue[JLabel];
-  translateTerm[term_] := Module[{choices, alternatives},
-    choices = Replace[
-      Prod2List[term],
-      f : (_ab | _sb) :> Module[{args = List @@ f, auxInFactor, replaced},
-        auxInFactor = Cases[args, Alternatives @@ auxLabels];
-        Which[
-          Length[auxInFactor] == 0,
-            {f},
-          Length[auxInFactor] >= 2,
-            Return[{}],
-          True,
-            replaced = Head[f] @@ (args /. First[auxInFactor] -> jLabel);
-            DeleteCases[DeleteDuplicates[{f, replaced}], 0]
-        ]
-      ],
-      {1}
-    ];
-    alternatives = DeleteCases[Expand[Times @@ #] & /@ Tuples[choices], 0];
-    alternatives
+  translateTerm[term_] := Module[{projected},
+    projected = SewingProjectAuxiliaryLabels[term, auxLabels, jLabel];
+    If[projected === 0, {}, {projected}]
   ];
   terms = Flatten[translateTerm /@ Sum2List[Expand[amp]]];
   DeleteDuplicates[DeleteCases[terms, 0]]
@@ -1006,11 +989,6 @@ SewingOpenPairMonomials[m_Integer?NonNegative, np_: Automatic] := Module[
   ]
 ];
 
-SewingBalancedOpenPairQ[open_Association] := Module[{p = open["OpenPowers"]},
-  Lookup[p, "Angle1", 0] + Lookup[p, "Angle2", 0] ===
-    Lookup[p, "Square1", 0] + Lookup[p, "Square2", 0]
-];
-
 ConstructLeft3PointOpenBasis[spinJ_Integer?NonNegative, OptionsPattern[]] := Module[
   {
     spin = OptionValue[MassiveSpin], pointCount = OptionValue[PointCount],
@@ -1298,7 +1276,8 @@ SewingLeftRecordCheck[left_Association] := Module[
   {issues = {}, jCounts, degree, qPower, expectedJ, expectedNonJ},
   jCounts = SewingJCounts[left["AmpL"]];
   degree = SewingLeftDegreeData[left["AmpL"]];
-  qPower = Max[Lookup[left, "J", 0] - 2 Lookup[left, "MassiveSpin", 1/2], 0];
+  qPower = Max[Lookup[left, "J", 0] - 2 Lookup[left, "MassiveSpin", 1/2], 0] +
+    Lookup[left, "OrbitalQPairs", 0];
   expectedJ = 2 (Lookup[left, "OpenSlots", 0] + qPower);
   expectedNonJ = Lookup[left, "ClosedSlots", 0];
   If[jCounts === $Failed,
@@ -2856,12 +2835,12 @@ ConstructProjectedSewingRelativeChiralBasis[
     ];
     leftRecordsCache[cacheKey] = SewingPerformanceTimed[
       traceRecord,
-      "General.Left3Point",
-      ConstructLeft3PointOpenBasis[
-        j,
-        MassiveSpin -> leftSpin,
-        PointCount -> pointCount,
-        QReplacement -> qSpec
+        "General.Left3Point",
+        ConstructLeft3PointOpenBasis[
+          j,
+          MassiveSpin -> leftSpin,
+          PointCount -> pointCount,
+          QReplacement -> qSpec
       ],
       <|"J" -> j, "Scope" -> "Projected"|>
     ]

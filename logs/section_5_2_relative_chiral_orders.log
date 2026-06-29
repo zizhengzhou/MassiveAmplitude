@@ -42,13 +42,13 @@ ROW 4
 RELATIVE_ORDER 3 COUNT 6
 ROW 1
   AmpDim: 4
-  J: 0
-  Kind: x
-  XPower: 1
-  AmpL: -1\left\langle 12\right\rangle-1\left[78\right]
-  AmpR: \left\langle 23\right\rangle\left[24\right]\left[46\right]
-  TotalAmp: \left\langle 12\right\rangle\left\langle 23\right\rangle\left[46\right]\left[47\right]+\left\langle 23\right\rangle\left[46\right]\left[47\right]\left[78\right]
-  ReducedAmp: -1\left\langle 34\right\rangle\left[14\right]\left[24\right]\left[34\right]-1\left\langle 13\right\rangle\left\langle 23\right\rangle\left[34\right]\left[34\right]
+  J: 1
+  Kind: open
+  XPower: 0
+  AmpL: \left\langle 1J\right\rangle\left\langle 2J\right\rangle
+  AmpR: \left\langle 3J\right\rangle\left\langle 3J\right\rangle\left[34\right]\left[46\right]
+  TotalAmp: \left\langle 13\right\rangle\left\langle 23\right\rangle\left[34\right]\left[46\right]
+  ReducedAmp: -1\left\langle 13\right\rangle\left\langle 23\right\rangle\left[34\right]\left[34\right]
 ROW 2
   AmpDim: 5
   J: 2

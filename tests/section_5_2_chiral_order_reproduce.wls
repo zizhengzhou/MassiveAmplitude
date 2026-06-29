@@ -102,10 +102,6 @@ writeWitnessLog[path_, byOrder_Association] := Module[{lines = {}},
 
 records = collectRecords[{3, 4, 5, 6}];
 selected = selectCumulative[records];
-badAmpDim4J1 = Select[selected, #["AmpDim"] === 4 && #["J"] === 1 &];
-If[badAmpDim4J1 =!= {},
-  fail["ampDim=4,J=1 records should not enter the independent relative-order basis", KeyTake[#, {"AmpDim", "J", "AmpL", "AmpR"}] & /@ badAmpDim4J1]
-];
 rows = Select[rowMeta /@ selected, MemberQ[{2, 3, 4}, #RelativeOrder] &];
 byOrder = GroupBy[rows, #RelativeOrder &];
 summary = Association[KeyValueMap[#1 -> Length[#2] &, byOrder]];
@@ -123,7 +119,7 @@ expectedKeys = <|
     <|"AmpDim" -> 4, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 2|>
   },
   3 -> {
-    <|"AmpDim" -> 4, "J" -> 0, "Kind" -> "x", "XPower" -> 1, "RelativeOrder" -> 3|>,
+    <|"AmpDim" -> 4, "J" -> 1, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,
     <|"AmpDim" -> 5, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,
     <|"AmpDim" -> 5, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,
     <|"AmpDim" -> 5, "J" -> 2, "Kind" -> "open", "XPower" -> 0, "RelativeOrder" -> 3|>,

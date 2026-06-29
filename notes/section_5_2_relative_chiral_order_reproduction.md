@@ -60,21 +60,28 @@ enter when they add a genuinely new reduced direction.
 
 ## Left Three-Point Correction
 
-The successful run depends on a correction to the left three-point open-current
-constructor.  For sectors without extra \(Q\)-raising factors, the open
-left block must be balanced between angle and square open slots.  The helper
-`SewingBalancedOpenPairQ` enforces
+The left three-point open-current constructor follows the paper formula
 
 ```wl
-Angle1 + Angle2 == Square1 + Square2
+ab[1, J]^a sb[L1, J]^(m - a)
+ab[2, J]^b sb[L2, J]^(m - b)
+Xhard^(r - k) Xsoft^k
+(ab[Q, J] sb[Q, J])^Max[J - N, 0]
 ```
 
-before forming the left records when `qExponent == 0`.
+with the full Cartesian enumeration
 
-This removes the over-broad pure square-square and pure angle-angle
-\(J=1\) left structures.  In particular, `ampDim=4,J=1` records are absent
-after this correction.  The valid leading `ampDim=4` open-current row is the
-`J=2` row with one \(Q\)-raising component.
+```wl
+a = 0, ..., m
+b = 0, ..., m
+k = 0, ..., r
+```
+
+where \(N=2s\), \(m=\min(J,N)\), and \(r=N-m\).  There is no additional
+balanced-angle filter.  For \(s=1/2,J=1\), this keeps all four open
+structures.  The formal \(Q\)-raising factor appears only for \(J>N\), so
+closed \(J=0\) `Xhard`/`Xsoft` rows do not acquire an extra
+`ab[Q,J] sb[Q,J]` factor.
 
 ## Reproduced Ordering
 
@@ -83,7 +90,7 @@ The witness test gives the following relative-order blocks.
 | relative order | split-term count | sources |
 | --- | ---: | --- |
 | 2 | 4 | two `ampDim=3,J=1` rows and two split `ampDim=4,J=2` terms |
-| 3 | 6 | one static `ampDim=4,J=0` row, three split `ampDim=5,J=2` terms, and two split `ampDim=6,J=3` terms |
+| 3 | 6 | one open `ampDim=4,J=1` row, three split `ampDim=5,J=2` terms, and two split `ampDim=6,J=3` terms |
 | 4 | 3 | one `ampDim=5,J=1` row and two split `ampDim=6,J=2` terms |
 
 The key leading-order check is therefore exact:
@@ -96,7 +103,8 @@ relative order 2: 4 split-term rows
   ampDim=4, J=2
 ```
 
-No `ampDim=4,J=1` row appears in the constructed record list.
+The first relative-order-3 representative is the `ampDim=4,J=1` open row
+made possible by the full Cartesian left three-point enumeration.
 
 ## Verification Commands
 
