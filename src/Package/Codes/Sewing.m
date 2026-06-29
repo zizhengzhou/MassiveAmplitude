@@ -1906,6 +1906,26 @@ SewingProjectReducedAmpToBasis[amp_, basis_List] := Expand[
   Total[Coefficient[Expand[amp], #] # & /@ basis]
 ];
 
+SewingMergeCFBlocks::usage =
+  "SewingMergeCFBlocks[cfBlocks] merges several ConstructIndepCFBlock outputs into one reduced target span {amps, coefficientMatrix, monomialBasis}. It is used when projected sewing groups full polarization sectors by the right-side polarization only.";
+SewingMergeCFBlocks[cfBlocks_List] := Module[
+  {validBlocks, amps, reducedRows, basis, matrix, positions},
+  validBlocks = Select[cfBlocks, ListQ[#] && Length[#] >= 3 && Length[#[[1]]] > 0 &];
+  If[Length[validBlocks] == 0, Return[{}]];
+  amps = Join @@ (#[[1]] & /@ validBlocks);
+  reducedRows = Join @@ MapThread[
+    Function[{matrix, monoms},
+      Total[MapThread[#1 #2 &, {#, monoms}]] & /@ matrix
+    ],
+    {validBlocks[[All, 2]], validBlocks[[All, 3]]}
+  ];
+  basis = Poly2Singlet[reducedRows];
+  If[Length[basis] == 0, Return[{}]];
+  matrix = Table[Coefficient[Expand[row], monom], {row, reducedRows}, {monom, basis}];
+  positions = FindIndependentBasisPos[matrix];
+  {amps[[positions]], matrix[[positions]], basis}
+];
+
 SewingValidMetaQ[meta_, np_Integer?Positive] :=
   ListQ[meta] && Length[meta] == 2 && ListQ[meta[[2]]] && Length[meta[[2]]] == np;
 
@@ -2502,7 +2522,8 @@ ProjectSewingAmplitudeRecords[
   opts : OptionsPattern[]
 ] := Module[
   {
-    debug, perfRecorder, cfAmps, cfMatrix, cfBasis, pointCount, masses, filteredRecords, projectedRecords,
+    debug, perfRecorder, cfAmps, cfMatrix, cfBasis, pointCount, masses, targetPolarizations,
+    representativePolarization, filteredRecords, projectedRecords,
     sewingMatrixData, joinedMatrixData, sortedRecords, independentBlock, selectedRecords,
     selectedMatrix, lorentzOperatorDict, identicalPolyDict, lorentzYoungOperator,
     independentPositions, projectedRecordsAfterIdentical, jBlockDiagnostics
@@ -2516,11 +2537,17 @@ ProjectSewingAmplitudeRecords[
   {cfAmps, cfMatrix, cfBasis} = localCFBlock[[1 ;; 3]];
   pointCount = Lookup[First[records, <||>], "PointCount", Length[fullPolarization]];
   masses = Lookup[First[records, <||>], "Mass", Automatic];
+  targetPolarizations = If[
+    Length[fullPolarization] > 0 && ListQ[First[fullPolarization]],
+    fullPolarization,
+    {fullPolarization}
+  ];
+  representativePolarization = First[targetPolarizations];
   filteredRecords = SewingPerformanceTimed[
     perfRecorder,
     "Project.FilterByPolarization",
-    Select[records, SewingRecordPolarizationMatchQ[#, {fullPolarization}, pointCount, masses] &],
-    <|"FullPolarization" -> fullPolarization, "RecordCount" -> Length[records]|>
+    Select[records, SewingRecordPolarizationMatchQ[#, targetPolarizations, pointCount, masses] &],
+    <|"FullPolarization" -> fullPolarization, "TargetPolarizationCount" -> Length[targetPolarizations], "RecordCount" -> Length[records]|>
   ];
   If[Length[filteredRecords] == 0,
     Message[ProjectSewingAmplitudeRecords::empty, fullPolarization];
@@ -2604,7 +2631,8 @@ ProjectSewingAmplitudeRecords[
         "CFRank" -> MatrixRank[cfMatrix],
         "SewingRank" -> sewingMatrixData["Rank"],
         "JoinedRank" -> joinedMatrixData["Rank"],
-        "FullPolarization" -> fullPolarization,
+        "FullPolarization" -> representativePolarization,
+        "FullPolarizations" -> targetPolarizations,
         "IdenticalInfo" -> identicalInfo,
         "CFBlock" -> localCFBlock,
         "CFBasis" -> cfBasis,
@@ -2641,6 +2669,8 @@ ProjectSewingAmplitudeRecords[
     "Projected.Lorentz",
     <|
       "FullPolarization" -> fullPolarization,
+      "RepresentativeFullPolarization" -> representativePolarization,
+      "FullPolarizations" -> targetPolarizations,
       "SelectedBeforeIdentical" -> Length[selectedRecords],
       "SelectedAfterIdentical" -> Length[projectedRecordsAfterIdentical]
     |>
@@ -2650,7 +2680,8 @@ ProjectSewingAmplitudeRecords[
     "CFRank" -> MatrixRank[cfMatrix],
     "SewingRank" -> sewingMatrixData["Rank"],
     "JoinedRank" -> joinedMatrixData["Rank"],
-    "FullPolarization" -> fullPolarization,
+    "FullPolarization" -> representativePolarization,
+    "FullPolarizations" -> targetPolarizations,
     "IdenticalInfo" -> identicalInfo,
     "CFBlock" -> localCFBlock,
     "CFBasis" -> cfBasis,
@@ -2704,6 +2735,8 @@ ConstructProjectedSewingRelativeChiralBasis[
   {
     debug, traceEnabled, traceEvents = {}, traceRecord, traceSummary, pointCount, spins, codeDim, leftMass, rightMassData, fullMass,
     invalidIdenticals, identicalTypeList, rightPolarizationFilter, candidateBlocks, unfilteredPhysicalBlocks, physicalBlocks,
+    rightPolarizationGroups, rightPolarizationGroup, rightPolarizationBlocks, fullPolarizations,
+    representativeFullPolarization, localCFBlocks,
     recordsByRightPolarization = <||>, leftRecordsCache = <||>, colorCache = <||>, sectorResults,
     projectedItemGroups, allProjectedItems, groupedBasis, getLeftRecordsForJ, getRecordsForRightPolarization,
     getColorData, fullPolarization, rightPolarization, localCFBlock,
@@ -2797,6 +2830,12 @@ ConstructProjectedSewingRelativeChiralBasis[
       "UnfilteredPhysicalBlocks" -> Length[unfilteredPhysicalBlocks],
       "PhysicalBlocks" -> Length[physicalBlocks]
     |>
+  ];
+  rightPolarizationGroups = GatherBy[physicalBlocks, #[[2, 3 ;;]] &];
+  SewingLog[
+    debug,
+    "Projected.RightPolarizationGroups",
+    <|"RightPolarizationGroups" -> Length[rightPolarizationGroups]|>
   ];
   getLeftRecordsForJ[j_Integer?NonNegative] := Module[{cacheKey},
     cacheKey = {j, leftSpin, pointCount, qSpec};
@@ -2892,31 +2931,39 @@ ConstructProjectedSewingRelativeChiralBasis[
   ];
   sectorResults = Reap[
     Do[
-      fullPolarization = block[[2]];
-      rightPolarization = fullPolarization[[3 ;;]];
-      blockAmpDim = block[[1]] - pointCount;
-      identicalInfo = Quiet@Check[ReAssignIdentical[fullPolarization, identicalTypeList], {}];
-      localCFBlock = SewingPerformanceTimed[
+      rightPolarizationBlocks = rightPolarizationGroup;
+      fullPolarizations = rightPolarizationBlocks[[All, 2]];
+      representativeFullPolarization = First[fullPolarizations];
+      rightPolarization = representativeFullPolarization[[3 ;;]];
+      blockAmpDim = rightPolarizationBlocks[[1, 1]] - pointCount;
+      identicalInfo = Quiet@Check[ReAssignIdentical[representativeFullPolarization, identicalTypeList], {}];
+      localCFBlocks = SewingPerformanceTimed[
         traceRecord,
         "Projected.ConstructIndepCFBlock",
         Quiet@Check[
-          ConstructIndepCFBlock[spins, block[[1]], fullPolarization, mass -> fullMass],
+          ConstructIndepCFBlock[spins, #[[1]], #[[2]], mass -> fullMass],
           $Failed
-        ],
-        <|"Block" -> block|>
+        ] & /@ rightPolarizationBlocks,
+        <|"RightPolarization" -> rightPolarization, "BlockCount" -> Length[rightPolarizationBlocks]|>
+      ];
+      localCFBlock = SewingPerformanceTimed[
+        traceRecord,
+        "Projected.MergeCFBlocks",
+        SewingMergeCFBlocks[localCFBlocks],
+        <|"RightPolarization" -> rightPolarization, "CFBlockCount" -> Length[localCFBlocks]|>
       ];
       If[! ListQ[localCFBlock] || Length[localCFBlock] < 3 || Length[localCFBlock[[1]]] == 0,
         Continue[]
       ];
       sewingRecords = getRecordsForRightPolarization[blockAmpDim, rightPolarization];
       If[sewingRecords === $Failed,
-        Message[ConstructProjectedSewingRelativeChiralBasis::sewing, fullPolarization];
+        Message[ConstructProjectedSewingRelativeChiralBasis::sewing, rightPolarization];
         Return[$Failed]
       ];
       sewingRecords = Append[#, "Mass" -> fullMass] & /@ sewingRecords;
       projection = ProjectSewingAmplitudeRecords[
         sewingRecords,
-        fullPolarization,
+        fullPolarizations,
         identicalInfo,
         localCFBlock,
         SewingDebug -> debug,
@@ -2926,7 +2973,7 @@ ConstructProjectedSewingRelativeChiralBasis[
       If[! TrueQ[projection["CompleteQ"]],
         Message[
           ConstructProjectedSewingRelativeChiralBasis::complete,
-          fullPolarization,
+          rightPolarization,
           projection["CFRank"],
           projection["SewingRank"],
           projection["JoinedRank"]
@@ -2953,7 +3000,10 @@ ConstructProjectedSewingRelativeChiralBasis[
         sectorOutput = Join[
           projection,
           <|
-            "Block" -> block,
+            "Block" -> First[rightPolarizationBlocks],
+            "Blocks" -> rightPolarizationBlocks,
+            "FullPolarizations" -> fullPolarizations,
+            "RepresentativeFullPolarization" -> representativeFullPolarization,
             "RightPolarization" -> rightPolarization,
             "ColorData" -> colorData,
             "DirectProductItemsBeforeProjection" -> {},
@@ -3007,7 +3057,10 @@ ConstructProjectedSewingRelativeChiralBasis[
       sectorOutput = Join[
         projection,
         <|
-          "Block" -> block,
+          "Block" -> First[rightPolarizationBlocks],
+          "Blocks" -> rightPolarizationBlocks,
+          "FullPolarizations" -> fullPolarizations,
+          "RepresentativeFullPolarization" -> representativeFullPolarization,
           "RightPolarization" -> rightPolarization,
           "ColorData" -> colorData,
           "DirectProductItemsBeforeProjection" -> directProductItems,
@@ -3018,7 +3071,7 @@ ConstructProjectedSewingRelativeChiralBasis[
         |>
       ];
       Sow[sectorOutput],
-      {block, physicalBlocks}
+      {rightPolarizationGroup, rightPolarizationGroups}
     ]
   ][[2]];
   sectorResults = If[Length[sectorResults] == 0, {}, First[sectorResults]];
@@ -3064,6 +3117,7 @@ ConstructProjectedSewingRelativeChiralBasis[
       "CandidateBlocks" -> candidateBlocks,
       "UnfilteredPhysicalBlocks" -> unfilteredPhysicalBlocks,
       "PhysicalBlocks" -> physicalBlocks,
+      "RightPolarizationGroups" -> rightPolarizationGroups,
       "RightPolarizationFilter" -> rightPolarizationFilter,
       "SU3ShapeList" -> OptionValue[su3ShapeList],
       "SU3IndexDictionaries" -> DeleteDuplicates[Lookup[Lookup[sectorResults, "ColorData", {}], "SU3IndexDictionary", <||>]],

@@ -55,8 +55,8 @@ If[Length[Select[allData["PhysicalBlocks"], rightLongitudinalQ]] =!= 4,
   fail["projected candidate blocks should keep all right long-long left-polarization sectors", allData["PhysicalBlocks"]]
 ];
 
-If[! MemberQ[Lookup[allData["SectorResults"], "FullPolarization", {}][[All, 3 ;; 4]], {1, 1}],
-  fail["projected sector results should include a nonzero right long-long sector", Lookup[allData["SectorResults"], "FullPolarization", {}]]
+If[! MemberQ[Lookup[allData["SectorResults"], "RightPolarization", {}], {1, 1}],
+  fail["projected sector results should include a nonzero right long-long sector", Lookup[allData["SectorResults"], "RightPolarization", {}]]
 ];
 
 contexts = formalSymbolContexts[allData["BasisByRelativeChiralOrder"]];
@@ -88,8 +88,8 @@ If[! AllTrue[filteredData["PhysicalBlocks"], rightLongitudinalQ],
   fail["right long-long filter should keep only right long-long CF blocks", filteredData["PhysicalBlocks"]]
 ];
 
-If[! AllTrue[Lookup[filteredData["SectorResults"], "FullPolarization", {}][[All, 3 ;; 4]], # === {1, 1} &],
-  fail["right long-long filter should keep only right long-long nonzero sectors", Lookup[filteredData["SectorResults"], "FullPolarization", {}]]
+If[! AllTrue[Lookup[filteredData["SectorResults"], "RightPolarization", {}], # === {1, 1} &],
+  fail["right long-long filter should keep only right long-long nonzero sectors", Lookup[filteredData["SectorResults"], "RightPolarization", {}]]
 ];
 
 q2Data = ConstructProjectedSewingRelativeChiralBasis[
