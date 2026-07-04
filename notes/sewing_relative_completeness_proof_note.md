@@ -639,7 +639,7 @@ formal backend in the even-\(J\) sewing sector.
 ## Independent mathematical audit
 
 An independent mathematical audit was performed after the first draft of this
-note.  The audit gave a fail-closed verdict: the conditional theorem is
+note.  The audit gave a conservative negative verdict: the conditional theorem is
 formally correct only after the extra hypotheses now stated above are included,
 and Proposition R remains open.  The audit specifically required:
 

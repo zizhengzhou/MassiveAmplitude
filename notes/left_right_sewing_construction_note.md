@@ -1,1054 +1,597 @@
 <!-- markdownlint-disable MD013 MD052 -->
 
-# Left-Right Sewing Construction for Heavy-Pair Current Factorization
+# 重重粒子振幅的左右缝合构造
 
-## Purpose and status
+## 目标与适用范围
 
-This note records the current left-right sewing construction for local on-shell
-amplitude bases with a distinguished heavy pair on legs \(1,2\).  It is meant
-as a followable technical note for discussion with collaborators.  The logic
-matches the current-factorization narrative used in the manuscript: the
-heavy-pair dependence is isolated into a finite three-point problem, while the
-right block keeps the local on-shell data of the original full contact
-amplitude.
+本文说明当前程序采用的左右缝合构造。目标是在含有一对等自旋重粒子的局域 on-shell 振幅中，按重粒子对的角动量通道组织 Lorentz 结构，并在约化后得到与既有 CF block 构造等价的独立完备基底。本文中的重粒子位于外腿 \(1,2\)，右侧物理粒子位于外腿 \(3,\ldots,n\)。所有粒子均取全入射约定。
 
-The construction has three ingredients:
+本文的逻辑分为三层。第一层给出数学对象：重粒子对的 \(J_{12}\) 角动量分解、左侧三点 current、右侧 residual block 和全对称缝合。第二层说明程序如何在有限维 spinor 多项式空间中实现这些对象，并如何与 CF block 做秩比较。第三层给出公开接口和 \(\bar B B u f_+\) 例子的可重复计算。
 
-1. A left three-point open basis for
-\[
-\ell+\ell+J .
-\]
-2. A right residual block represented conceptually by formal \(J\)-slot Young
-tableaux, and implemented through a two-auxiliary-particle on-shell surrogate
-validated by reduced-span checks.
-3. A fully symmetric contraction over all \(J\) slots, followed by the same
-massless-limit reduction and linear-rank test used for `ConstructIndepCFBlock`.
+本文只讨论当前程序已经实现的等自旋重粒子对。程序入口 `ConstructProjectedSewingRelativeChiralBasis` 令外腿 \(1,2\) 的自旋相同。若要推广到不等自旋重粒子对，需要重新定义左三点 open-current 结构和未匹配 heavy spin slot 的闭合因子。
 
-The recommended way to read the note is not from the most general formula
-first.  The logic is:
+## 标签、质量与极化约定
 
-1. Work through the four-point spin-one example below.
-2. Observe that every full amplitude can be decomposed into a transmitted
-\(12\)-channel angular momentum \(J\).
-3. Enumerate the simple left problem, where two on-shell heavy particles couple
-to one off-shell current.
-4. Generate the more complicated right residual problem by replacing the
-off-shell current with two auxiliary massless slots and filtering back to the
-formal \(J\)-slot sector.
-5. Sew and check the resulting vectors against the independently generated CF
-block.
+本文使用的外腿标签具有固定含义。腿 \(1,2\) 始终是等自旋重粒子对，腿 \(3,\ldots,n\) 是右侧物理粒子。程序主函数的位置参数 `rightMass` 只描述右侧哪些物理腿是 massive；腿 \(1,2\) 在内部总是手动加入 massive 集合。因此
 
-The current claim is deliberately scoped.  In all checked four-point, five-point
-and selected six-point sectors, the sewn amplitudes span the same reduced
-massless-limit vector space as the independently constructed CF blocks:
-\[
-\operatorname{Span}\{\overline A_{\rm sew}\}
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin,
+  rightSpins,
+  {3},
+  ampDim,
+  identicalParam
+]
+```
+
+表示腿 \(3\) 是右侧 massive 粒子，而不是说完整 massive 集合只有 \(\{3\}\)。实际传入底层构造的完整集合为 \(\{1,2,3\}\)。若省略位置参数 `rightMass`，主函数的默认含义是右侧物理腿 \(3,\ldots,n\) 全部 massive。这个约定与较低层 fixed-polarization 辅助函数的历史默认值不同，因此在主函数的讨论中必须始终以主函数语义为准。
+
+massive square-spinor 的特殊标签只用于记录 massive 极化。对于 \(n\) 点振幅，massive 腿 \(i\) 的 square slot 在内部可能被替换为 \(2n+1-i\) 类型的 reflected label，例如四点时腿 \(1,2\) 的 massive square 标签为 \(8,7\)。这种标签只表示 massive little-group polarization slot，不能用于动量标签。特别地，formal `Q` 永远表示 \(Q=P_1-P_2\)，不可能变成 \(8,7,6,\ldots\) 这样的 massive square label。
+
+polarization 约定也需要分开理解。massive spin-\(s\) 腿的极化标签为 \(0,1,\ldots,2s\)，它表示该 massive leg 中 square-type slot 的个数；例如 massive spin-one 的 polarization \(0,1,2\) 分别对应不同的 longitudinal/transverse representative。massless 粒子的 helicity 由输入的 spin 符号和粒子类型决定，程序中 massless leg 的 polarization slot 取唯一值 \(0\)。因此，右侧极化 sector \(\rho_R\) 只对 massive 右侧腿有真正的多值枚举，对 massless 右侧腿只是占位的 \(0\)。
+
+CF block 的历史接口使用 code dimension。当前主函数的输入是文章中的振幅维数 \(d_{\rm amp}\)，并在枚举 CF sector 时把固定极化 block 写成
+
+$$
+\{d_{\rm amp}+n,\rho\},
+$$
+
+其中 \(\rho\) 是完整外腿极化列表。这一步不需要重新计算物理维数，也不应调用旧的维数推断函数。给定 `spins`、`ampDim` 和完整 massive 集合后，程序直接枚举所有允许的 \(\rho\)，再由 identical 规则和 `RightPolarizationFilter` 选择真正需要计算的 sector。
+
+## 振幅空间与约化对象
+
+固定外部数据
+
+$$
+\mathcal D=(s;\,s_3,\ldots,s_n;\,\mathcal M_R;\,\rho_R;\,d_{\rm amp}),
+$$
+
+其中 \(s\) 是腿 \(1,2\) 的共同自旋，\(\{s_3,\ldots,s_n\}\) 是右侧物理腿的自旋，\(\mathcal M_R\subset\{3,\ldots,n\}\) 是右侧 massive leg 集合，\(\rho_R\) 是右侧极化 sector，\(d_{\rm amp}\) 是文章使用的振幅维数。腿 \(1,2\) 总是 massive。程序内部把完整 massive 集合写成
+
+$$
+\mathcal M=\{1,2\}\cup\mathcal M_R .
+$$
+
+令 \(\mathscr P(\mathcal D)\) 为满足上述自旋、质量和极化条件的局域 spinor 多项式空间。它仍包含 Schouten identity、momentum conservation、EoM relation 和 massive-to-massless representative choice 产生的等价关系。约化后的振幅空间定义为
+
+$$
+\mathscr A(\mathcal D)
 {}=
-\operatorname{Span}\{\overline A_{\rm CF}\}.
-\]
-This is stronger than matching a few examples, but weaker than a formal theorem
-for every spin, mass assignment, polarization sector, and dimension.  The
-evidence is nevertheless substantial: no counterexample has been found in the
-current scans, including systematic tests with left spin \(\ell=3/2\).
+\mathscr P(\mathcal D)/\mathscr I_{\rm os},
+$$
 
-## Minimal worked target
+其中 \(\mathscr I_{\rm os}\) 是这些 on-shell 等价关系生成的子空间。程序通过 `ReduceSt` 和相关 massless representative 规则实现对 \(\mathscr I_{\rm os}\) 的商空间坐标化。给定一组候选振幅 \(\{A_i\}\)，约化后得到坐标向量
 
-The smallest nontrivial target that shows the whole mechanism is the four-point
-sector
-\[
-\ell=\frac12,\qquad R=\{1,0\},\qquad
-\mathrm{mass}=\{3\},\qquad
-\mathrm{polarization}=\{1,0\},\qquad d_{\rm amp}=4 .
-\]
-Here legs \(1,2\) are the heavy spin-one-half pair.  On the right, leg \(3\) is
-a massive spin-one particle with polarization label \(1\), and leg \(4\) is a
-massless scalar.  The goal is to reproduce the same four-dimensional reduced
-space as `ConstructIndepCFBlock`.
+$$
+\operatorname{red}(A_i)\in \mathbb C^{N_{\rm mon}},
+$$
 
-The calculation proceeds as follows.
+其中 \(N_{\rm mon}\) 是该 sector 中 reduction 后 monomial basis 的长度。把这些向量按行排列得到 coefficient matrix。独立性和完备性判断都只作用在这些约化坐标上。
 
-1. Choose a left \(J=1\) open structure.  One useful choice after the default
-\(Q\to2\) convention is
-\[
-A_{\rm L}=\langle2J\rangle[8J].
-\]
-Both brackets contain a \(J\) slot, so this left factor contributes no closed
-non-\(J\) bracket to the residual right dimension.
+既有 CF block 构造提供同一商空间中的参考基底。若 CF 候选给出矩阵 \(M_{\rm CF}\)，缝合候选给出矩阵 \(M_{\rm sew}\)，则同一 reduced space 的 span 等价性由
 
-2. Build right residual candidates with formal \(J\) slots.  One compatible
-right expression is
-\[
-A_{\rm R}=\langle23\rangle\langle4J\rangle[24][6J].
-\]
-It contains exactly the \(J\)-slots needed to contract the left expression.
-In the auxiliary implementation, such right candidates are generated by adding
-two temporary massless particles before legs \(3,4\), scanning equal auxiliary
-spins, and translating the surviving auxiliary occurrences back to formal
-\(J\) slots.
-
-3. Sew the two \(J\)-slots symmetrically.  For this row the reduced amplitude
-has coordinate vector
-\[
-(0,-1,0,0)
-\]
-in the reduced basis
-\[
-\begin{aligned}
-e_1&=\langle24\rangle\langle34\rangle[14][34],\\
-e_2&=\langle24\rangle^2[14][24],\\
-e_3&=\langle14\rangle\langle24\rangle[24]^2,\\
-e_4&=\langle14\rangle\langle34\rangle[24][34].
-\end{aligned}
-\]
-Thus this single sewn row gives the direction \(-e_2\).  Repeating the same
-steps for all valid left and right candidates gives ten raw sewn records; four
-independent rows span the same four-dimensional space as the CF block.
-
-This example is expanded again later with the full coefficient matrices.  Its
-purpose here is to show what it means to reproduce the construction by hand:
-write a left open current structure, generate a right formal-\(J\) structure,
-contract the open \(J\) slots, reduce, and record the coordinate vector.
-
-## Notation and code objects
-
-The symbols used below mix physics notation and names of local code routines.
-The following table fixes the intended meaning.
-
-| symbol or name | meaning |
-| --- | --- |
-| \(\ell\) | common spin of the two heavy external legs \(1,2\) |
-| \(J\) | spin of the auxiliary \(12\)-channel current |
-| \(Q\) | heavy-pair momentum \(p_1+p_2\) |
-| \(R\) | list of right-side physical spins, for example \(R=\{1,0\}\) |
-| \(d_{\rm amp}\) | bracket dimension of the full sewn amplitude |
-| SSYT | semistandard Young tableau: rows weakly increase, columns strictly increase |
-| CF block | the independent current-factorization block from `ConstructIndepCFBlock` |
-| `Amp2MetaInfo` | code check returning spin, mass, polarization, and dimension metadata |
-| `ReduceSt` | code reduction by EoM, Schouten identities, and momentum conservation |
-| `Poly2Singlet` | code routine used to choose the common reduced monomial basis |
-| reduced massless-limit space | the quotient vector space after massive labels are relabelled to massless labels and `ReduceSt` is applied |
-
-## Relation to the current-factorization picture
-
-Consider a local contact amplitude with a heavy pair on legs \(1,2\) and right
-particles
-\[
-X=\{3,\ldots,n\}.
-\]
-The reason for introducing a left-right sewing description is angular momentum
-in the \(12\to X\) channel.  A local amplitude is a Lorentz-covariant tensor
-polynomial.  If we group legs \(1,2\) into one side and all other legs into the
-other side, the tensor indices transmitted across the cut organize into
-irreducible \(SO(3)\) representations in the rest frame of the heavy pair.
-Those irreducible representations are labelled by an angular momentum \(J\).
-Therefore any contact structure can be resolved into components with definite
-transmitted \(J\).
-
-This is the same logic as an ordinary partial-wave decomposition, but it is
-used here only as a finite algebraic bookkeeping device for local contact
-polynomials.  There is no physical propagator and no factorization pole.  The
-current \(\mathcal J_J\) is an auxiliary representation label for the tensor
-indices that flow between the heavy pair and the right block.
-
-The factorized organization is
-\[
-\mathcal A_{12+X}^{(d)}
+$$
+\operatorname{rank}M_{\rm CF}
 {}=
-\sum_{J,a}
-\mathcal V_{12\to\mathcal J_J}^{(a)}
-\odot_J
-\mathcal R_{\mathcal J_J\to X}^{(a)} .
-\]
-Here \(\mathcal J_J\) is not a propagating physical particle.  It is a book
-keeping current carrying the \(12\)-channel angular momentum \(J\), with
-momentum
-\[
-Q=p_1+p_2 .
-\]
-The symbol \(\odot_J\) means that every open \(J\) index on the left is
-contracted with an open \(J\) index on the right in the spin-\(J\)
-representation.  The label \(a\) in the sum denotes the chosen left
-three-point tensor structure together with the compatible right residual
-structure before the final linear-independence reduction.
-
-This explains why the left problem has the form
-\[
-\ell+\ell+J .
-\]
-It is the universal local vertex for two on-shell heavy particles of spin
-\(\ell\) emitting an off-shell current carrying angular momentum \(J\).  The
-left side is simple because it is a three-object tensor problem with two
-ordinary on-shell massive legs and one formal current slot.  It can therefore
-be enumerated explicitly.
-
-The right object \(\mathcal R_{\mathcal J_J\to X}\) should not be replaced by
-an ordinary on-shell amplitude with one fewer external particle.  The original
-local \(n\)-point amplitude contains invariants involving \(Q\), such as
-\[
-Q^2,\qquad Q\cdot p_i,\qquad i=3,\ldots,n .
-\]
-These are physical local data of the original contact amplitude, not EoM
-redundancies of a real on-shell current.  Therefore the right block must remain
-embedded in the same local polynomial space as the original full amplitude,
-with the only extra restriction that part of its spinor structure is organized
-as formal \(J\) slots.
-
-The right side is harder because it must carry the same transmitted
-representation while still remembering the full local \(n\)-point kinematics.
-This is why the auxiliary construction is useful.  Instead of trying to write a
-new off-shell massive-current SSYT constructor from scratch, we simulate the
-current slots by two temporary massless auxiliary entries.  The full on-shell
-constructor then generates candidate Young tableaux, and the later filters keep
-only those candidates that translate back to a valid formal \(J\)-slot right
-block.  In this sense the two auxiliaries are a computational realization of
-the same transmitted-angular-momentum bookkeeping.
-
-The executable checks in this note compare the final projected vector space
-after the massless relabeling and `ReduceSt` reduction.  They do not by
-themselves prove an unreduced isomorphism of the full \(Q^2\) and
-\(Q\cdot p_i\) polynomial algebra.  The right-block construction is designed
-to preserve those local data before projection, while the current numerical
-evidence is the reduced-span equality stated above.
-
-This is the practical reason for the construction below.  The left block
-contains the hard static-recoil information associated with the heavy pair.
-The right block contains the remaining local soft structures, including the
-dependence on \(Q\).  Sewing recombines them into ordinary \(n\)-point contact
-amplitudes.
-
-## Left three-point open basis
-
-The left three-point problem is
-\[
-\ell+\ell+J ,
-\]
-where the two heavy legs have the same spin \(\ell\) and the third object is the
-auxiliary current.  Write the open current slot as a dot,
-\[
-\cdot .
-\]
-The two closed heavy-pair scalar structures are represented by
-\[
-x,\qquad y,
-\]
-spanning the same two-dimensional space as
-\[
-[12]+\langle12\rangle,\qquad [12]-\langle12\rangle .
-\]
-The precise normalization of \(x,y\) is a convention; what matters for the
-current construction is that they form the rotated static/recoil pair used in
-the manuscript and in the code as the `Xhard` and `Xsoft` sector.
-For a spin-one-half pair there is only one symmetric little-group slot on each
-heavy leg, so a closed heavy-pair scalar can only live in this two-dimensional
-space.  For higher equal spin, leftover paired heavy slots are symmetric
-products of the same two-dimensional space, hence the monomials
-\(x^{r-k}y^k\).
-
-Let
-\[
-N=2\ell,\qquad m=\min(J,N),\qquad r=N-m .
-\]
-The meaning is:
-
-1. \(N\) is the number of symmetric little-group spin slots on each heavy leg.
-2. \(m\) is the number of heavy spin slots on each leg attached to the current.
-3. \(r\) is the number of closed heavy-pair scalar slots left over.
-4. If \(J>N\), all heavy spin slots are already attached to the current and
-the remaining spin of the current is carried by \(Q\)-raising factors.
-
-For fixed \(J\), the left basis is
-\[
-\mathcal A_{J;a,b,k}^{(\ell)}
+\operatorname{rank}M_{\rm sew}
 {}=
-\langle1\cdot\rangle^{a}[1\cdot]^{m-a}
-\langle2\cdot\rangle^{b}[2\cdot]^{m-b}
-x^{r-k}y^k
-\bigl(\langle Q\cdot\rangle[Q\cdot]\bigr)^{\max(J-N,0)},
-\]
-with
-\[
-a,b=0,\ldots,m,\qquad k=0,\ldots,r .
-\]
-Read the formula as four factors.  The first factor assigns the \(m\) open
-slots of leg \(1\) between angle and square brackets.  The second factor does
-the same for leg \(2\).  The third factor stores the \(r\) leftover closed
-heavy-pair slots as \(x,y\) monomials.  The last factor appears only when the
-current spin \(J\) is larger than the number of heavy spin slots available on
-each leg.
-
-The number of structures is
-\[
-(m+1)^2(r+1).
-\]
-For \(J\ge N\), this stabilizes to
-\[
-(N+1)^2 .
-\]
-
-This formula is the operational equal-spin basis implemented by the current
-three-point open-basis code.  The assumptions are part of the definition: the
-two heavy legs are distinguishable, their spins are equal, the massive
-spinor-helicity convention is fixed, no exchange symmetry between legs \(1,2\)
-is imposed, and no additional parity or charge-conjugation projection is
-applied.  Under these assumptions, the powers on leg \(1\) are symmetrized among
-the \(m\) open slots of leg \(1\), and similarly for leg \(2\).  The explicit
-sewing code keeps the open current slots as \(J\)-labeled bracket positions and
-later contracts them symmetrically.
-
-### Spin one-half pair
-
-For
-\[
-\ell=\frac12,\qquad N=1 ,
-\]
-the \(J=0\) basis is purely closed:
-\[
-x,\qquad y .
-\]
-For every \(J\ge1\), no closed \(x,y\) factor remains.  The four open structures
-are
-\[
-\begin{aligned}
-\mathcal A_{J,1}
-{}&=[1\cdot]\langle2\cdot\rangle
-\bigl(\langle Q\cdot\rangle[Q\cdot]\bigr)^{J-1},\\
-\mathcal A_{J,2}
-{}&=\langle1\cdot\rangle[2\cdot]
-\bigl(\langle Q\cdot\rangle[Q\cdot]\bigr)^{J-1},\\
-\mathcal A_{J,3}
-{}&=[1\cdot][2\cdot]
-\bigl(\langle Q\cdot\rangle[Q\cdot]\bigr)^{J-1},\\
-\mathcal A_{J,4}
-{}&=\langle1\cdot\rangle\langle2\cdot\rangle
-\bigl(\langle Q\cdot\rangle[Q\cdot]\bigr)^{J-1}.
-\end{aligned}
-\]
-For example, \([1\cdot]\langle2\cdot\rangle\) means that one square spinor from
-leg \(1\) and one angle spinor from leg \(2\) are left with an uncontracted
-current slot.  That slot is not evaluated until it is sewn to a right-block
-\(J\) slot.
-
-Thus the spin-one-half left block has two structures at \(J=0\) and four
-structures for every \(J\ge1\).  The \(Q\)-factor is not split into separate
-left basis elements.  If one chooses \(Q=p_1+p_2\), the expansion is applied
-only as a later sewing convention.
-
-### Spin three-halves pair
-
-For
-\[
-\ell=\frac32,\qquad N=3 ,
-\]
-there are three symmetric spin slots on each heavy leg.  When \(J<3\), only
-\(J\) slots attach to the current and the remaining \(3-J\) slots form closed
-\(x,y\) factors.
-
-For \(J=0\):
-\[
-x^3,\qquad x^2y,\qquad xy^2,\qquad y^3 .
-\]
-
-For \(J=1\), let
-\[
-\begin{aligned}
-B_1&=[1\cdot]\langle2\cdot\rangle,\\
-B_2&=\langle1\cdot\rangle[2\cdot],\\
-B_3&=[1\cdot][2\cdot],\\
-B_4&=\langle1\cdot\rangle\langle2\cdot\rangle .
-\end{aligned}
-\]
-The twelve structures are
-\[
-B_i x^2,\qquad B_i xy,\qquad B_i y^2,
-\qquad i=1,\ldots,4 .
-\]
-
-For \(J=2\), the open part is
-\[
-\mathcal D_{a,b}
-{}=
-\langle1\cdot\rangle^{a}[1\cdot]^{2-a}
-\langle2\cdot\rangle^{b}[2\cdot]^{2-b},
-\qquad a,b=0,1,2 .
-\]
-The eighteen structures are
-\[
-\mathcal D_{a,b}x,\qquad \mathcal D_{a,b}y,
-\qquad a,b=0,1,2 .
-\]
-
-For \(J=3\), all heavy spin slots are attached to the current:
-\[
-\mathcal C_{a,b}
-{}=
-\langle1\cdot\rangle^{a}[1\cdot]^{3-a}
-\langle2\cdot\rangle^{b}[2\cdot]^{3-b},
-\qquad a,b=0,1,2,3 .
-\]
-There are sixteen structures.  For every \(J\ge3\), the same sixteen
-structures remain, multiplied by
-\[
-\bigl(\langle Q\cdot\rangle[Q\cdot]\bigr)^{J-3}.
-\]
-
-This gives the pattern
-\[
-\begin{array}{c|c|c}
-J & \text{left structures} & \text{count}\\
-\hline
-0 & x^3,\ x^2y,\ xy^2,\ y^3 & 4\\
-1 & B_i x^2,\ B_i xy,\ B_i y^2 & 12\\
-2 & \mathcal D_{a,b}x,\ \mathcal D_{a,b}y & 18\\
-J\ge3 & \mathcal C_{a,b}
-(\langle Q\cdot\rangle[Q\cdot])^{J-3} & 16
-\end{array}
-\]
-with the index ranges displayed above.
-
-### Unequal-spin outlook
-
-The current implementation and the checks in this note are for
-\[
-\ell+\ell+J .
-\]
-The unequal-spin case
-\[
-\ell_1+\ell_2+J,\qquad \ell_1\ne\ell_2 ,
-\]
-is not yet part of the implemented basis.  The expected extension is clear but
-needs a separate derivation.  The two heavy legs have different numbers of
-little-group slots,
-\[
-N_1=2\ell_1,\qquad N_2=2\ell_2 .
-\]
-One should enumerate open-slot numbers \(m_1,m_2\) separately, require them to
-couple to the spin-\(J\) current, and allow only the matched leftover pairs to
-form \(x,y\)-type closed factors.  Any remaining current spin that cannot be
-absorbed by the two heavy legs should again be carried by
-\(\langle Q\cdot\rangle[Q\cdot]\) factors.  The natural representation-theory
-language is the Clebsch-Gordan decomposition of
-\[
-\ell_1\otimes\ell_2 .
-\]
-However, the exact analogue of the equal-spin formula above has not yet been
-implemented or validated.  It should therefore remain an open question rather
-than be used as a claimed part of the present construction.
-
-## Right residual block
-
-### Formal \(J\)-slot tableaux
-
-The direct mathematical object on the right is a residual SSYT with formal
-\(J\)-marked slots.  The entries are ordered as
-\[
-1<2<J<3<4<\cdots<n<2n<\cdots .
-\]
-In the four-point examples that motivated the construction this reduces to the
-order
-\[
-1<2<J<3<4<6 .
-\]
-The doubled massless-label convention is the usual one: in an \(n\)-point
-amplitude the square partner of label \(i\) is \(2n+1-i\), and the final
-massless relabeling sends
-\[
-2n+1-i\mapsto i .
-\]
-Thus at four points the square partners of legs \(1,2,3,4\) are
-\[
-8,\ 7,\ 6,\ 5 .
-\]
-Rows are weakly increasing and columns are strictly increasing.  The tableau is
-split by a vertical bar into an angular part and a square part.  Angular
-columns are converted through the Hodge-dual rule, while square columns are
-read directly.
-
-The formal \(J\) should be interpreted as an open current slot, not as an
-ordinary external particle.  The following restrictions encode this:
-
-1. The angular part cannot contain the label \(6\), or more generally the
-massless-square partner labels after the standard massless-index doubling.
-2. Columns \(1J\) and \(2J\) are not allowed in the angular part.
-3. A \(J\) column must appear with a physical right label, such as \(3\) or
-\(4\), rather than with only heavy-pair labels.
-4. Supplemental heavy-pair labels \(1,2\), when needed to represent columns
-such as \(1;2\), are allowed only on the angular side.
-5. The final sewn amplitude must pass the ordinary `Amp2MetaInfo` spin,
-polarization, and dimension check.
-
-A minimal four-point example is a right angular column \(J3\).  Its Hodge-dual
-partner is \(J4\), so it can produce a bracket such as
-\(\langle J4\rangle\) in the formal right block.  By contrast, an angular
-column \(1J\) is rejected: it tries to pair the formal current with a heavy
-leg on the wrong side of the split.  A bracket containing both auxiliary labels
-in the auxiliary implementation is rejected for the same reason; it does not
-represent either a physical right label paired with \(J\), or an allowed
-supplemental heavy-pair column.
-
-This direct formal-\(J\) description is conceptually clean, but it requires a
-custom tableau generator.  The more robust implementation now used in the code
-uses already-tested full on-shell amplitude constructors as a computational
-surrogate.  The validation currently comes from the reduced-span comparison
-with CF blocks, not from a separately proven formal-\(J\) versus auxiliary
-tableau bijection.
-
-### Auxiliary-particle construction
-
-The auxiliary construction introduces two massless auxiliary particles,
-denoted \(a,b\), before the physical right particles:
-\[
-(a,b,3,\ldots,n).
-\]
-The local labels \(a,b\) are temporary auxiliary labels.  They are not the
-global heavy legs \(1,2\).  Their only purpose is to let the existing
-full-amplitude SSYT constructor generate candidate spinor structures with two
-extra massless entries.
-
-The role of \(a,b\) is not to introduce new physics.  They are a representation
-device that lets the existing full on-shell SSYT machinery generate the
-candidate right residual block.  After generation, every auxiliary occurrence
-is translated back into either a supplemental heavy-pair column or a formal
-\(J\) slot.
-
-Two auxiliaries are needed because the residual right block must be able to
-represent both kinds of missing data: supplemental columns like \(1;2\), and
-single formal-current slots paired with physical right labels.  A one-auxiliary
-construction cannot distinguish these two roles.  A fixed auxiliary spin is
-also not enough in general, so the code imposes only the equal-spin convention
-\(S_a=S_b\) and scans the common value.
-
-The convention imposed in the current implementation is
-\[
-S_a=S_b=s .
-\]
-The value of \(s\) is not fixed once and for all.  Instead, the construction
-scans the allowed common auxiliary spin values and keeps only those that pass
-the ordinary on-shell construction constraints and the later formal-\(J\)
-checks.
-
-Operationally, for a fixed left record and a fixed target amplitude dimension,
-the right-side calculation is:
-
-1. Compute how much bracket dimension remains for the right block:
-\[
-d_{\rm R}=d_{\rm amp}-d_{\rm L}^{(0)} .
-\]
-2. Form the auxiliary on-shell problem with external data
-\[
-(a,b,3,\ldots,n),
-\]
-where \(a,b\) are massless and have equal spin \(s\).
-3. Scan the common value \(s\) over the allowed half-integer range and keep
-only values passing `CheckAmpConstruction`.
-4. Use the ordinary SSYT amplitude constructor on this auxiliary problem.
-5. Reject any term containing an auxiliary-auxiliary bracket or a massless
-self-pair column.
-6. Translate the remaining auxiliary occurrences to supplemental heavy-pair
-columns or formal \(J\) slots.
-7. Keep only records whose metadata and reduced nonzero amplitudes match the
-target sector.
-
-This list is the practical reproduction recipe.  A hand calculation may skip
-the auxiliary scan and write a formal-\(J\) right block directly, but the code
-uses the scan because it reuses the complete full-amplitude SSYT machinery.
-
-For a left record, let
-\[
-d_{\rm L}^{(0)}
-\]
-be the number of left brackets that do not contain a \(J\) slot.  If the full
-target amplitude has bracket dimension \(d_{\rm amp}\), the right auxiliary
-constructor is called at
-\[
-d_{\rm R}=d_{\rm amp}-d_{\rm L}^{(0)} .
-\]
-For an \(n\)-point full amplitude, the right auxiliary problem still has \(n\)
-points: two auxiliary massless particles plus the \(n-2\) physical right
-particles.  The code dimension passed to the underlying constructor is
-\[
-D_{\rm R}=d_{\rm R}+n .
-\]
-For a spin-one-half \(J=1\) left structure such as
-\[
-\langle2J\rangle[8J],
-\]
-both brackets contain a \(J\) slot, so \(d_{\rm L}^{(0)}=0\).  For a structure
-with one closed heavy-pair factor \(x\) or \(y\), that closed factor contributes
-one non-\(J\) bracket to \(d_{\rm L}^{(0)}\).
-
-The scanned auxiliary spins are
-\[
-s\in\left\{-d_{\rm R},-d_{\rm R}+\frac12,\ldots,d_{\rm R}-\frac12,d_{\rm R}\right\},
-\qquad (S_a,S_b)=(s,s).
-\]
-This range is intentionally broad.  Most values are removed by
-`CheckAmpConstruction`, by the formal-\(J\) translation, or by the final
-metadata and rank checks.
-
-The translation/filtering rules are:
-
-1. A bracket containing both auxiliary labels is rejected.  In the formal
-\(J\) language, this would correspond to an unphysical auxiliary-auxiliary
-bracket rather than a supplemental heavy-pair column or a \(J\) slot.
-2. A bracket containing a massless self-pair
-\[
-\{i,2n+1-i\}
-\]
-inside the same column is rejected before reduction, because it would become
-\(\langle ii\rangle\) or \([ii]\).
-3. A single auxiliary label in the allowed angular position can represent a
-supplemental heavy-pair label, such as the column \(1;2\), or can be translated
-to a formal \(J\) slot when it is paired with a right physical label.
-4. A candidate that translates to the wrong spin or polarization sector is
-discarded by `Amp2MetaInfo`.
-5. A candidate whose reduced massless limit is zero is discarded before the
-rank comparison.
-
-The important point is that \(S_a=S_b\) is the auxiliary convention, but the
-magnitude \(s\) is selected dynamically.  A single fixed value of \(s\) is not
-complete in general.  The equal-spin scan over \(s\), followed by the formal
-\(J\) filters, is what reproduces the right reduced span in the checked cases.
-
-### Why this uses existing full-amplitude knowledge
-
-The auxiliary construction is useful because it reduces the right residual
-problem to the already-tested full on-shell construction.  The full constructor
-already knows how to enumerate SSYT structures, impose row and column
-semistandardness, implement mass and polarization constraints, and quotient by
-the standard on-shell identities.  The auxiliary labels then impose the extra
-information that the right block must carry the missing formal \(J\) slots.
-
-This is why the right block is not treated as an ad hoc list of hand-written
-tableaux.  The implementation uses the full amplitude machinery to generate a
-large candidate set, applies the formal-\(J\) interpretation as a filter, and
-then tests the output against the independent CF construction.
-
-## Sewing prescription
-
-The left and right expressions contain multiple open \(J\) slots.  The sewing
-operation is the fully symmetric contraction over these slots.  Let \(n_J\) be
-the number of \(J\)-slot pairs to be contracted in the relevant angle or square
-sector.  Schematically,
-\[
-A_{\rm sew}
-{}=
-\sum_{\sigma\in S_{n_J}}
-A_{\rm L}^{I_1\cdots I_{n_J}}
-A_{{\rm R},I_{\sigma(1)}\cdots I_{\sigma(n_J)}} .
-\]
-In the actual bracket expression this is performed on the angle and square
-\(J\)-slots with the compatible bracket type.  The sum is over all
-permutations.  Repeated permutations are retained; there is no division by
-\(n_J!\).  This is the correct convention for the implemented polynomial basis,
-where repeated slots represent fully symmetrized little-group tensors with
-multiplicity.  Overall normalization is irrelevant for the span comparisons
-performed in this note.
-
-For example, if two identical \(J\) slots appear on both sides, the two
-permutations may generate the same monomial twice.  Keeping both copies changes
-only the row normalization or integer coefficients in the coordinate matrix; it
-does not change the reduced linear span.
-
-In bracket notation, this means that every left \(J\)-labeled angle or square
-slot is paired with a right \(J\)-labeled slot in all possible ways.  The
-implementation keeps the massive-square partner labels fixed during sewing.
-For the four-point examples this means
-\[
-1\mapsto 8,\qquad 2\mapsto 7
-\]
-on square spinors before the final massless-index relabeling.
-
-The default \(Q\)-replacement convention is
-\[
-\texttt{QReplacement -> 2},
-\]
-so that
-\[
-\langle QJ\rangle[QJ]\mapsto \langle2J\rangle[7J].
-\]
-This is a deterministic computational convention for basis generation.  It is
-not the physical identity \(Q=p_1+p_2\).  Physical formulae should either use
-the summed insertion below, or separately check that the deterministic choice
-spans the same reduced space in the sector under consideration.
-
-If the option is set to
-\[
-\texttt{QReplacement -> \{1,2\}},
-\]
-the code forms the single summed insertion
-\[
-\langle1J\rangle[8J]+\langle2J\rangle[7J].
-\]
-It is not counted as two independent basis elements.  Representative checks
-with both choices give the same CF rank, sewing rank, and joined rank.
-
-## Reduction and independence test
-
-Both the sewn amplitudes and the CF blocks are compared in the same reduced
-massless-limit vector space.  The reduction first maps massive doubled labels
-to massless labels by the standard rule
-\[
-2n+1-i\mapsto i ,
-\]
-then applies the on-shell reduction, EoM identities, Schouten identities, and
-momentum conservation through the same `ReduceSt` path used by the CF pipeline.
-The comparison is not made at the raw-record level.
-It is also not a claim that the unreduced \(Q\)-invariant polynomial algebra has
-been proved identical term by term.  The checked statement is equality in the
-projected reduced quotient space used for physical basis extraction.
-
-Let
-\[
-\{e_\alpha\}
-\]
-be the monomial basis returned by `Poly2Singlet` for the union of reduced CF
-and sewing amplitudes.  Each reduced amplitude is written as
-\[
-\overline A_i=\sum_\alpha M_{i\alpha}e_\alpha .
-\]
-This gives three matrices:
-\[
-M_{\rm CF},\qquad M_{\rm sew},\qquad
-M_{\rm joined}=
+\operatorname{rank}
 \begin{pmatrix}
 M_{\rm CF}\\
 M_{\rm sew}
-\end{pmatrix}.
-\]
-The completeness and independence criterion used in the checks is
-\[
+\end{pmatrix}
+$$
+
+判断。这个检查不是定义缝合方法本身，而是当前程序用来确认每个 sector 中 sewing construction 与 CF construction 等价的可执行标准。
+
+固定右侧极化 \(\rho_R\) 与完整 CF 极化 \(\rho\) 的关系如下。缝合构造本身不需要预先固定腿 \(1,2\) 的 massive polarization，因为左侧三点 current 已经枚举了所有与重粒子对有关的 little-group slot 分配。相反，CF block 是完整 \(n\) 点振幅的 fixed-polarization 构造，它要求给出
+
+$$
+\rho=(\rho_1,\rho_2,\rho_3,\ldots,\rho_n).
+$$
+
+因此，对一个固定右侧 sector \(\rho_R=(\rho_3,\ldots,\rho_n)\)，程序比较 sewing span 与 CF span 时会取
+
+$$
+\rho_1,\rho_2=0,1,\ldots,2s,
+\qquad
+\rho_{3\ldots n}=\rho_R,
+$$
+
+并把这些完整 CF blocks 合并为同一个参考 reduced space。这个合并不是物理投影，而是为了把“左侧 current 已经包含的所有重腿极化分量”与“CF 构造必须逐个完整极化输入”的接口差异统一起来。
+
+主函数 `ConstructProjectedSewingRelativeChiralBasis` 还要在固定右侧 sector 之外处理全同粒子和可选颜色结构。它先通过 `GenerateNeedCFBlocks` 枚举所有完整极化 sector，再通过 `FilterCFBlocksByIdentical` 折叠全同粒子的等价混合极化 sector，最后把剩余 blocks 按右侧极化 \(\rho_R\) 分组。每个分组共享同一组 sewing records；该分组内可能含有多个完整 \(\rho\)，它们共同定义后续 Lorentz projection 所需的 CF 参考空间。
+
+## 动量分解与角动量通道
+
+重粒子对的总动量与相对动量分别定义为
+
+$$
+p_+^\mu=P_1^\mu+P_2^\mu,\qquad
+Q^\mu=p_-^\mu=P_1^\mu-P_2^\mu .
+$$
+
+在 heavy-baryon 展开中，\(p_+\) 是流入右侧轻自由度的软动量，而 \(Q\) 是重粒子对内部的硬相对动量。程序中的 formal `Q` 永远表示这个动量标签；它不是 massive square-spinor 的极化标签，也不会被替换成 \(2n,2n-1,\ldots,n+1\) 这样的 reflected massive label。
+
+局域接触振幅被写成 \(12\) 通道角动量和 current spinor weight 的和，
+
+$$
+\mathcal A_{12\,3\cdots n}^{(d_{\rm amp})}
+{}=
+\sum_{J_{12},\omega}
+\mathcal A_L^{(J_{12},\omega)}\odot_{J_{12},\omega}
+\mathcal A_R^{(J_{12},\omega)}.
+$$
+
+这里 \(\mathcal A_L^{(J_{12},\omega)}\) 是重粒子对与辅助 current 的三点结构，\(\mathcal A_R^{(J_{12},\omega)}\) 是带 formal \(J\)-slot 的右侧 residual 结构，\(\odot_{J_{12},\omega}\) 表示把左右两边所有 formal \(J\)-slot 作 singlet contraction。辅助 current 只用于对角化 \(12\) 通道角动量；它不是物理传播粒子。权重 \(\omega\) 记录 current 的 anti-holomorphic minus holomorphic spinor weight。在程序中它不是单独输入，而是由 formal \(J\)-slot 计数实现：
+
+$$
+\omega=N_J^{\square}-N_J^{\angle}.
+$$
+
+因此，按 \(N_J^{\angle}\) 与 \(N_J^{\square}\) 分别过滤右侧 residual block 等价于同时固定 \((J_{12},\omega)\)。
+
+重粒子对的 hard scaling 由左侧 current 决定。当前程序使用相对 chiral-order 标签
+
+$$
+d_{\rm rel}=d_{\rm amp}-J_{12}-n_x ,
+$$
+
+其中 \(d_{\rm amp}\) 是程序输入的振幅维数，\(n_x\) 是左侧显式 `Xhard` 因子的幂次。这个标签用于同一计算内部排序。完整物理 chiral dimension 还可能包含外场归一化和具体 operator convention 的整体平移。
+
+## 左侧三点 current 结构
+
+设两条重腿的共同自旋为 \(s\)，并记
+
+$$
+N=2s .
+$$
+
+左侧三点结构由腿 \(1,2\) 和 formal current \(J\) 构成。程序把 current 的 spinor label 也记作 \(J\)。对于给定 \(J_{12}=J\)，定义
+
+$$
+m=\min(J,N),\qquad r=N-m .
+$$
+
+当前等自旋构造采用如下基底：
+
+$$
+\mathcal V_{J;a,b,k}
+{}=
+\langle 1J\rangle^a[1J]^{m-a}
+\langle 2J\rangle^b[2J]^{m-b}
+X_{\rm hard}^{\,r-k}X_{\rm soft}^{\,k}
+\bigl(\langle QJ\rangle[QJ]\bigr)^{\max(J-N,0)},
+$$
+
+其中
+
+$$
+a,b=0,\ldots,m,\qquad k=0,\ldots,r .
+$$
+
+这不是三角形截取，而是对腿 \(1\) 和腿 \(2\) 的 angle/square 分配分别取笛卡尔积。其含义如下。每条重腿有 \(N\) 个 little-group spinor slot。current 最多从每条重腿吸收 \(m\) 个 slot；剩余 \(r\) 个 heavy-pair slot 由两种闭合因子 `Xhard` 与 `Xsoft` 生成。若 \(J>N\)，额外角动量由唯一的 current-raising 因子 \(\langle QJ\rangle[QJ]\) 承担。因而 formal `Q` 只来自左侧三点 current，右侧 residual block 本身不应含有 formal `Q`。
+
+这个公式也给出每个 \(J\) 通道的左侧候选数：
+
+$$
+N_L(s,J)=(m+1)^2(r+1).
+$$
+
+该数目不是最终物理基底数。它只统计左侧三点 current 的 independent tensor structures；右侧 residual block、缝合、on-shell reduction 和全同投影仍会改变候选记录数和最终 representative 数。
+
+程序中左侧 current 同时保存 symbolic form 和 amp form。symbolic form 使用 `L1`、`L2`、`Q`、`Xhard`、`Xsoft` 保留物理来源；amp form 则把这些符号转成可约化的 spinor 表达式。对 \(n\) 点振幅，`L1` 与 `L2` 在 amp form 中分别对应腿 \(1,2\) 的 massive square 标签 \(2n\) 与 \(2n-1\)。闭合因子的内部替换为
+
+$$
+X_{\rm hard}\mapsto [L_1L_2]-\langle12\rangle,
+\qquad
+X_{\rm soft}\mapsto [L_1L_2]+\langle12\rangle .
+$$
+
+这里的替换只用于商空间约化和秩计算。最终输出可以重新显示为 `Xhard` 与 `Xsoft`，从而保留 hard/soft 左侧闭合因子的物理分类。formal `Q` 的替换也只在 amp form 中进行，默认
+
+$$
+Q\mapsto p_1-p_2 .
+$$
+
+由于 `Q` 总是动量标签，程序对 \(\langle QJ\rangle[QJ]\) 的替换按成对 angle-square 因子逐项进行。例如 `QReplacement -> {1,-2}` 将一个 formal pair 转成两项之差，而不是把 `Q` 当作某个 massive square-spinor label。
+
+对于 spin-\(\frac12\) 重粒子对，\(N=1\)。闭合通道为
+
+$$
+J_{12}=0:\qquad
+\mathcal A_L=\{X_{\rm hard},X_{\rm soft}\}.
+$$
+
+开 current 通道 \(J_{12}=1\) 为
+
+$$
+\mathcal A_L^{J_{12}=1}
+{}=
+\left\{
+\langle 2J\rangle[1J],
+\langle 1J\rangle[2J],
+[2J][1J],
+\langle 1J\rangle\langle 2J\rangle
+\right\}.
+$$
+
+当 \(J_{12}=2\) 时，在上面四个结构后乘以 \(\langle QJ\rangle[QJ]\)；更高 \(J_{12}\) 重复乘以该 raising factor。
+
+对于 spin-\(\frac32\) 重粒子对，\(N=3\)。\(J_{12}=0\) 有 \(X_{\rm hard},X_{\rm soft}\) 的三次齐次多项式；\(J_{12}=1\) 有二次齐次多项式并从每条重腿取一个 current slot；\(J_{12}=2\) 有一次 \(X_{\rm hard}\) 或 `Xsoft` 因子并从每条重腿取两个 current slot；\(J_{12}\ge3\) 不再有额外 \(X_{\rm hard},X_{\rm soft}\) 因子，所有 heavy spin slot 都接到 current 上，若 \(J_{12}>3\) 再乘以 \((\langle QJ\rangle[QJ])^{J_{12}-3}\)。
+
+可以把 spin-\(\frac32\) 的低 \(J\) 结构写成下表。表中 \(a,b\) 的范围是每条重腿可接入 current 的 angle-slot 数。
+
+| \(J_{12}\) | \(m\) | \(r\) | \(X_{\rm hard},X_{\rm soft}\) 次数 | current spinor 因子 |
+| --- | ---: | ---: | --- | --- |
+| \(0\) | \(0\) | \(3\) | \(X_{\rm hard}^{3-k}X_{\rm soft}^{k}\), \(k=0,1,2,3\) | 无 |
+| \(1\) | \(1\) | \(2\) | \(X_{\rm hard}^{2-k}X_{\rm soft}^{k}\), \(k=0,1,2\) | \(\langle1J\rangle^a[1J]^{1-a}\langle2J\rangle^b[2J]^{1-b}\) |
+| \(2\) | \(2\) | \(1\) | \(X_{\rm hard}^{1-k}X_{\rm soft}^{k}\), \(k=0,1\) | \(\langle1J\rangle^a[1J]^{2-a}\langle2J\rangle^b[2J]^{2-b}\) |
+| \(J\ge3\) | \(3\) | \(0\) | 无 | \(\langle1J\rangle^a[1J]^{3-a}\langle2J\rangle^b[2J]^{3-b}(\langle QJ\rangle[QJ])^{J-3}\) |
+
+这张表也是检查左侧构造是否正确的最直接方法。若 \(J=1\) 或 \(J=2\) 被错误地按三角形条件过滤，而不是对 \(a,b\) 取笛卡尔积，则会漏掉合法三点 current structure。
+
+## 右侧 residual block
+
+右侧 residual block 保存原始局域振幅中除重粒子对三点 current 以外的 Lorentz 数据。数学上，它可看作带 formal \(J\)-slot 的 SSYT 构造。其 bracket 内容必须与左侧 current 的 \(J\)-slot 数匹配。若左侧结构含有
+
+$$
+N_J^{\angle} \quad\hbox{个 angle }J\hbox{ slot},\qquad
+N_J^{\square} \quad\hbox{个 square }J\hbox{ slot},
+$$
+
+则右侧 residual 只保留满足同一组 \(J\)-slot 计数的结构。
+
+程序实现采用两个临时无质量辅助粒子来生成右侧 residual。辅助粒子不是物理外腿。其作用只是让已有 on-shell SSYT/CF 构造可以枚举包含 formal \(J\)-slot 的右侧结构。构造结束后，辅助标签被投影回 formal \(J\)，随后执行三类过滤：
+
+1. 去除 auxiliary self-contraction 和投影后为零的项。
+2. 检查投影后 angle \(J\)-slot 与 square \(J\)-slot 是否分别等于左侧目标。
+3. 检查右侧物理粒子自旋、质量与极化 sector 是否与输入一致。
+
+更明确地说，一条左侧 record 传给右侧构造的数据可以写成
+
+$$
+\left(J;\,N_J^{\angle},N_J^{\square};\,d_L;\,d_{\rm amp}\right).
+$$
+
+右侧生成器先在包含两个辅助无质量腿与 \(n-2\) 个右侧物理腿的普通 on-shell 振幅空间中枚举候选项。辅助腿的自旋不是外部物理输入，而是由 bracket 维数、目标 \(J\)-slot 数和等辅助自旋约束共同限制。随后把两个辅助腿的 spinor labels 投影为同一个 formal \(J\)-slot。只有投影后正好留下 \(N_J^{\angle}\) 个 angle \(J\)-slot 与 \(N_J^{\square}\) 个 square \(J\)-slot 的项才保留。这个过程实现的是“先在普通 on-shell 构造中枚举，再投影到 formal residual space”的计算策略。
+
+从数学上看，右侧 residual 不是一个独立的物理散射振幅。它保留右侧局域 Lorentz 结构及其与 formal current 的耦合方式，但 formal current 并非传播粒子。因此右侧 residual 允许有 \(J\)-slot，却不允许有 heavy-pair closed factor，也不允许生成 \(Q=P_1-P_2\)。若在某个右侧 record 中看到 formal `Q`、`Xhard` 或 `Xsoft`，则说明来源混淆，必须回到左侧三点 current、右侧投影或缝合映射中检查错误。
+
+右侧 residual 的振幅维数由 bracket 维数守恒决定。若完整 sewn amplitude 的维数为 \(d_{\rm amp}\)，左侧结构的总 bracket degree 为 \(d_L\)，其中 \(J\)-slot 的总数为 \(N_J=N_J^{\angle}+N_J^{\square}\)，则右侧 residual 使用
+
+$$
+d_R=d_{\rm amp}-d_L+N_J .
+$$
+
+这个公式反映了缝合时每一对 \(J\)-slot 被收缩成一个普通 spinor bracket：左右两侧各贡献一个 formal slot，但 sewn amplitude 中只留下一个物理 bracket 因子。
+
+计算上可以把一条左侧 record 之后的右侧选择理解为下表。
+
+| 输入对象 | 右侧使用方式 |
+| --- | --- |
+| \(N_J^{\angle}\) | 右 residual 投影后必须含有的 angle \(J\)-slot 数 |
+| \(N_J^{\square}\) | 右 residual 投影后必须含有的 square \(J\)-slot 数 |
+| \(d_L\) | 与 \(d_{\rm amp}\) 和 \(N_J\) 一起决定 \(d_R\) |
+| \(\rho_R\) | 过滤右侧物理腿的 massive polarization sector |
+| \(\mathcal M_R\) | 传给右侧 on-shell 生成器的右侧 massive 集合 |
+
+不同左侧 record 可能给出相同的 \((d_R,N_J^{\angle},N_J^{\square},\rho_R)\)。程序会在同一次主函数调用中复用这类右侧 projected records；这只是计算优化，不改变数学定义。
+
+辅助粒子的自旋不是额外物理输入，而是由右侧 on-shell 生成器的 bracket 维数和 formal \(J\)-slot 目标共同决定。程序实际枚举一组候选辅助自旋，默认要求两个辅助粒子等自旋，然后只保留投影后满足目标 \((N_J^{\angle},N_J^{\square})\) 的项。这个做法的数学意义是用普通 on-shell SSYT 构造实现 formal \(J\)-slot residual space。若一个 auxiliary record 在投影回 formal \(J\) 后含有不正确的 \(J\)-slot 数、仍含辅助标签、出现 self-contraction，或右侧物理极化不匹配，则它不属于目标 residual block。
+
+右侧 residual 与左侧 current 的来源严格分离。左侧 current 可以含 `Q`、`Xhard`、`Xsoft`；右侧 residual 不产生这些 formal heavy-pair 因子。特别地，在 \(\bar B B u f_+\) 例子的 \(d_{\rm amp}=4\) 中，\(J_{12}=2\) 行的 `Q` 因子来自左侧 raising factor \(\langle QJ\rangle[QJ]\)，而不是来自右侧 \(A_R\)。
+
+## 全对称缝合与表示分离
+
+给定一个左侧 monomial 和一个右侧 monomial，缝合把左侧所有 \(J\)-slot 与右侧所有 \(J\)-slot 作全对称 singlet contraction。若有多种等价收缩方式，程序提供两种解释：
+
+* `SewingContractionMode -> "Split"`：把全对称和中的每一项作为一个单独 record。当前默认值为 `"Split"`。
+* `SewingContractionMode -> "Sum"`：把同一组全对称收缩直接求和，作为一个 record。
+
+两种设置不会改变 span 完备性。`"Split"` 的优势是每一项在排序和独立性选择前保留更细的来源信息；后续 reduced coefficient matrix 会自动去除线性冗余。
+
+若左侧 monomial 含有 \(N_J\) 个 formal \(J\)-slot，右侧 monomial 也含有 \(N_J\) 个 formal \(J\)-slot，则全对称缝合可写成
+
+$$
+\mu_J(L,R)
+{}=
+\sum_{\pi\in S_{N_J}}
+\prod_{\alpha=1}^{N_J}
+C\!\left(J_\alpha,J'_{\pi(\alpha)}\right)
+\;L_{\rm rest}R_{\rm rest},
+$$
+
+其中 \(C\) 表示 angle 与 square slot 的 singlet contraction，\(L_{\rm rest}\) 与 \(R_{\rm rest}\) 是去掉 formal \(J\)-slot 后的其余因子。`"Sum"` 模式直接使用 \(\mu_J(L,R)\)。`"Split"` 模式则把每个 permutation term 分别记录为 \(\mu_{J,\pi}(L,R)\)。因为所有 split terms 都属于 \(\mu_J(L,R)\) 展开的线性空间，且后续 reduction 按矩阵秩选择 independent rows，所以 split/sum 的差别只影响代表元来源和排序，不改变最终 span。
+
+一个简单例子可以说明 `"Split"` 的含义。设
+
+$$
+A_L=X_{\rm hard}[1J][2J],
+\qquad
+A_R=[3J][4J].
+$$
+
+全对称缝合的求和形式为
+
+$$
+A_{\rm sew}
+{}=X_{\rm hard}\bigl([13][24]+[14][23]\bigr).
+$$
+
+在 `"Sum"` 模式中，这个和式作为一个 record 进入后续约化；在 `"Split"` 模式中，程序记录两条 symbolic records，
+
+$$
+X_{\rm hard}[13][24],
+\qquad
+X_{\rm hard}[14][23].
+$$
+
+这里被拆开的是全对称收缩产生的多项式项，而不是左侧 closed factor 本身。`Xhard`、`Xsoft` 和 formal `Q` 在 symbolic form 中始终作为整体来源标签保留；只有进入 amp form 约化时才按一一映射规则替换成真实 spinor 表达式。
+
+程序同时维护两种表示。`SewingSymForm` 是展示用的 symbolic form，其中保留 `Q`、`Xhard`、`Xsoft`。`SewingAmpForm` 是内部约化用的 amp form，其中 `Q` 按 `QReplacement` 展开为真实动量标签，`Xhard` 与 `Xsoft` 也被替换为能参与 spinor-polynomial reduction 的表达式。独立性判断总是在 amp form 上进行。选出独立 record 后，最终输出再映射回 symbolic form。这个映射必须是一一对应的；否则会出现约化用结构和展示结构不一致的问题。
+
+更具体地说，程序为每个 record 同时保存
+
+| 字段 | 含义 |
+| --- | --- |
+| `SewingSymForm` | 最终展示用结构，保留 formal `Q`、`Xhard`、`Xsoft` |
+| `SewingAmpForm` | 内部约化用结构，已把 formal 因子替换为可约化 spinor 表达式 |
+| `ReducedAmp` | 对 `SewingAmpForm` 约化后的 monomial 坐标对象 |
+| `SortData` | 包含 \(J\)、`Xhard` power、`Xsoft` power 的排序元数据 |
+
+最终基底选择的逻辑是：先按 `SortData` 和 chiral-order key 对 record 排序，再对 `ReducedAmp` 构成的矩阵做 rank selection，最后把被选中的 record 映射回 `SewingSymForm`。因此，读者在输出中看到的 `Q`、`Xhard`、`Xsoft` 不是参与线性代数的抽象占位符，而是与内部 amp form 一一对应的展示标签。
+
+默认设置
+
+```wl
+QReplacement -> {1, -2}
+```
+
+表示 \(Q=p_1-p_2\)。若希望最终结果中仍显示 formal `Q`，应使用
+
+```wl
+ReplaceQInFinalSymbolForm -> False
+```
+
+## 完备性、全同投影与颜色结构
+
+对于固定右侧极化 sector，程序将 sewn records 做 massless-limit reduction，并与 `ConstructIndepCFBlock` 得到的 CF block 在同一个 reduced monomial basis 中比较。设三组矩阵分别为 \(M_{\rm sew}\)、\(M_{\rm CF}\) 和纵向拼接矩阵 \(M_{\rm joined}\)。完备性检查要求
+
+$$
+\operatorname{rank}M_{\rm sew}
+{}=
+\operatorname{rank}M_{\rm CF}
+{}=
+\operatorname{rank}M_{\rm joined}.
+$$
+
+这个等式说明 sewing construction 在该 sector 中生成的 span 与既有 CF block 完全相同。随后程序按固定优先级选择独立 record，并按 \(d_{\rm rel}\) 分组。
+
+固定 sector 的计算次序可以概括为以下数学步骤。
+
+1. 枚举左侧 \(\mathcal V_{J;a,b,k}\)，得到每条左侧 record 的 \(J\)-slot target。
+2. 根据 \(d_R=d_{\rm amp}-d_L+N_J\) 枚举右侧 auxiliary on-shell records。
+3. 把 auxiliary labels 投影回 formal \(J\)，并按 \((N_J^{\angle},N_J^{\square})\) 过滤。
+4. 对每一对匹配的左、右 record 做全对称缝合。
+5. 把 symbolic record 转换成 amp form 并做 on-shell reduction。
+6. 与 CF block 在同一 reduced monomial basis 中比较 rank。
+7. 在 verified span 中按优先级选取 independent representatives。
+
+其中第六步采取保守失败准则：若 rank 等式不成立，主函数不会把该 sector 当作成功结果返回。这一点区分了“生成一些候选结构”和“得到经 CF 比较验证的独立完备基底”。
+
+投影主函数还在固定 sector 计算外面包了一层物理调度。给定 `leftSpin`、`rightSpins`、`rightMass`、`ampDim` 和 `identicalParam` 后，它先形成
+
+$$
+\texttt{spins}=\{s,s,s_3,\ldots,s_n\},
+\qquad
+\mathcal M=\{1,2\}\cup\mathcal M_R .
+$$
+
+随后 `GenerateNeedCFBlocks` 枚举所有允许的完整 CF descriptors \(\{d_{\rm amp}+n,\rho\}\)。这些 descriptors 经过 `FilterCFBlocksByIdentical` 后分为两类。若某组全同粒子具有不同极化，则只保留一个代表 sector；若某组全同粒子具有完全相同极化，则该 sector 需要真正计算 Young projection。`RightPolarizationFilter` 在这个代表元列表上继续删去不允许的右侧极化。
+
+经过这些选择后，程序按 \(\rho_R=\rho_{3\ldots n}\) 分组，而不是按完整 \(\rho\) 分组。这样做的原因是 sewing 生成只依赖右侧物理极化；腿 \(1,2\) 的极化已经在左侧 current 中枚举。对每个右侧分组，程序做三件事：
+
+1. 对分组内所有完整 \(\rho\) 分别调用 `ConstructIndepCFBlock`。
+2. 用 `SewingMergeCFBlocks` 把这些 CF blocks 合并成一个 reduced target span。
+3. 对同一个 \(\rho_R\) 构造 sewing records，并投影到这个合并后的 CF span。
+
+这也是为什么主函数能处理“右侧极化相同但腿 \(1,2\) 极化不同”的 CF 参考空间。若按完整 \(\rho\) 分组，会把同一个 sewing residual 重复计算，并可能在输出中产生重复 representative。
+
+全同粒子只允许出现在右侧物理粒子中。程序沿用旧的 identical-sector 处理：不同极化的全同粒子先选代表元，真正相同极化的 sector 再计算右侧置换作用在 Lorentz basis 上的矩阵，并由 Young operator 投影。由于 sewing construction 的 \(J_{12}\) 分类来自左侧 current，而全同置换只作用在右侧物理腿上，预期 Lorentz permutation matrix 对 \(J_{12}\) 分块对角。相关测试检查了这一性质。
+
+Lorentz 投影矩阵的构造使用 amp form，而不是 symbolic form。设经过 fixed-sector rank 检查和优先级排序后得到的独立 Lorentz records 为
+
+$$
+B_i=\sum_a c_{ia} e_a,
+$$
+
+其中 \(e_a\) 是共同 reduced monomial basis。对一个右侧置换 \(\sigma\)，程序先把 \(\sigma\) 作用在 selected records 的 amp form 上并再次约化，
+
+$$
+\sigma(B_i)=\sum_a c^{(\sigma)}_{ia}e_a .
+$$
+
+由两组坐标矩阵 \(c\) 与 \(c^{(\sigma)}\) 可解出置换在独立 Lorentz basis 上的表示矩阵 \(P_{\rm Lorentz}(\sigma)\)。Young operator 是这些置换矩阵的多项式。这个过程不依赖 symbolic `Q/Xhard/Xsoft` 展示形式，因此不会把展示标签误当作新的 Lorentz 多项式自由度。
+
+若开启 `su3ShapeList`，程序调用旧的 SU(3) 结构生成函数得到 color basis 和 color permutation matrix。Lorentz 与 color 的关系是 direct product。投影使用
+
+$$
+P_{\rm total}=P_{\rm Lorentz}\otimes P_{\rm color},
+$$
+
+随后仍通过 coefficient matrix 的秩选择独立 representative，而不是把 Lorentz 多项式与 color 多项式普通相乘后再化简。
+
+## 公开程序接口
+
+普通使用者只需要调用
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin,
+  rightSpins,
+  ampDim,
+  identicalParam,
+  opts
+]
+```
+
+或显式指定右侧 massive label：
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  leftSpin,
+  rightSpins,
+  rightMass,
+  ampDim,
+  identicalParam,
+  opts
+]
+```
+
+其中 `leftSpin` 是腿 \(1,2\) 的共同自旋，`rightSpins` 是腿 \(3,\ldots,n\) 的自旋列表，`rightMass` 只表示右侧哪些物理腿有质量，`ampDim` 是文章中的振幅维数，`identicalParam` 是右侧全同粒子分组。若省略 `rightMass`，主函数中 `Automatic` 表示右侧所有物理腿 \(3,\ldots,n\) 都有质量；腿 \(1,2\) 总是在内部视为有质量。
+
+默认返回值是 association：
+
+```wl
+<|
+  relativeOrder1 -> {basis1, basis2, ...},
+  relativeOrder2 -> {...}
+|>
+```
+
+其中 key 是 \(d_{\rm rel}\)。若设置 `ReturnProjectionData -> True`，返回 association 会包含 sector-level records、CF/sewing rank、identical Young operator、SU(3) 字典和 \(J\)-block 诊断数据。
+
+最常用的选项如下表。
+
+| 选项 | 默认值 | 含义 |
+| --- | --- | --- |
+| `RightMass` | `Automatic` | 右侧 massive label；主函数中 `Automatic` 表示右侧 \(3,\ldots,n\) 全部 massive |
+| `su3ShapeList` | `{}` | SU(3) shape labels；空列表表示只计算 Lorentz 结构 |
+| `RightPolarizationFilter` | `All` | 过滤右侧物理腿极化；key 必须是 \(3,\ldots,n\) 的粒子标签 |
+| `QReplacement` | `{1,-2}` | 内部 amp form 中 \(Q\) 的替换，即 \(Q=p_1-p_2\) |
+| `ReplaceQInFinalSymbolForm` | `True` | 是否在最终 symbolic 输出中也替换 formal `Q` |
+| `ReturnProjectionData` | `False` | 是否返回 sector records、rank、投影矩阵和诊断数据 |
+| `SewingContractionMode` | `"Split"` | 全对称缝合项是拆成多条 records 还是先求和 |
+| `SewingDebug` | `False` | 是否打印默认关闭的调试日志 |
+
+`RightPolarizationFilter` 的 association 形式为
+
+```wl
+RightPolarizationFilter -> <|3 -> 1, 5 -> {0, 2}|>
+```
+
+其中 key 是右侧物理腿标签，value 可以是一个整数、整数列表或 `All`。该过滤不作用于腿 \(1,2\)，因为主函数不会用腿 \(1,2\) 的极化决定 sewing 调度。若使用全同粒子，过滤作用在 identical representative selection 之后的物理 sector 列表上。
+
+若需要检查中间步骤，`ReturnProjectionData -> True` 是推荐入口。典型字段包括 `"CandidateBlocks"`、`"PhysicalBlocks"`、`"RightPolarizationGroups"`、`"SectorResults"`、`"BasisByRelativeChiralOrder"` 和 `"PerformanceSummary"`。其中 `"SectorResults"` 内部保存每个右侧极化分组的 `CFRank`、`SewingRank`、`JoinedRank`、`RecordsBeforeIdentical`、`Records`、`LorentzYoungOperator` 和 \(J\)-block diagnostics。
+
+## \(\bar B B u f_+\) 可重复例子
+
+考虑四点 sector
+
+$$
+(\bar B,B,u,f_+)=(1,2,3,4).
+$$
+
+输入为
+
+```wl
+ConstructProjectedSewingRelativeChiralBasis[
+  1/2,
+  {1, 1},
+  {3},
+  ampDim,
+  {},
+  su3ShapeList -> {},
+  RightPolarizationFilter -> <|3 -> 1|>,
+  ReturnProjectionData -> True,
+  ReplaceQInFinalSymbolForm -> False
+]
+```
+
+这里腿 \(3\) 是有质量 spin-one \(u_\mu\)，腿 \(4\) 是无质量正 helicity \(f_+\)。`RightPolarizationFilter -> <|3 -> 1|>` 把右侧 sector 固定到 \(u\) 的 longitudinal polarization；腿 \(4\) 的正 helicity 已由 massless spin-one 输入固定。若不加这个过滤，主函数会枚举所有右侧物理极化 sector，得到的 association 不是本文表格所展示的单一 sector。
+
+固定 `ampDim` 的主函数返回的是该维数内部的 relative-order 分组。对本文 sector，当前程序给出的结构计数为
+
+| `ampDim` | relative-order 计数 | 物理来源 |
+| ---: | --- | --- |
+| \(3\) | order \(2\) 有 \(2\) 个结构 | 两个 \(J_{12}=1\) open-current rows |
+| \(4\) | order \(2\) 有 \(1\) 个结构，order \(3\) 有 \(2\) 个结构 | 一个 raised \(J_{12}=2\) row 与两个 \(J_{12}=1\) rows |
+
+文章中的 leading/NLO 表格不是把每个固定 `ampDim` 完全独立地读出后直接并列，而是把 \(d_{\rm amp}=3,4,\ldots\) 的候选项放入同一个优先级排序中，再按 relative chiral order 选择独立方向。因此，\(d_{\rm amp}=3\) 的两个 \(J_{12}=1\) rows 与 \(d_{\rm amp}=4\) 的 raised \(J_{12}=2\) row 同属 leading relative order；\(d_{\rm amp}=4\) 的两个 \(J_{12}=1\) residual rows 属于下一阶。
+
+若要从程序返回值中机械抽取表格里的 \(A_L,A_R,A_{\rm sew}\)，可使用 `ReturnProjectionData -> True` 后的 `"Records"` 字段。例如对 \(d_{\rm amp}=4\)，运行
+
+```wl
+res4 = ConstructProjectedSewingRelativeChiralBasis[
+  1/2,
+  {1, 1},
+  {3},
+  4,
+  {},
+  su3ShapeList -> {},
+  RightPolarizationFilter -> <|3 -> 1|>,
+  ReturnProjectionData -> True,
+  ReplaceQInFinalSymbolForm -> False
+];
+
+records4 = res4["SectorResults"][[1, "Records"]];
+
+({#["J"], #["AmpLSymbolForm"], #["AmpR"], #["SewingSymForm"],
+   SewingRelativeChiralOrder[#]} &) /@ records4
+```
+
+输出的五列依次为 \(J_{12}\)、\(A_L\)、\(A_R\)、\(A_{\rm sew}\) 和 \(d_{\rm rel}\)。同样的代码把 `4` 改成 `3` 即可抽取 \(d_{\rm amp}=3\) 的两行。为了阅读方便，表格中把 `L1,L2` 写回腿 \(1,2\) 的 massive square slot，把 `ab`、`sb` 分别写成角括号与方括号。
+
+若只需要验证固定右侧极化 \(\{1,0\}\) 的 sewn span 与 CF block 等价，可使用较低层 fixed-polarization 比较函数：
+
+```wl
+CompareGeneralSewingToCFBlocks[
+  1/2, {1, 1}, {3}, ampDim, {1, 0},
+  JMax -> 3,
+  QReplacement -> 2
+]
+```
+
+这个函数只用于 rank/span verification。它的内部独立 representative 选择可以与本文表格中的 manuscript-facing representative 不同，但三者张成同一个 reduced amplitude space。本文下面的 \(A_L,A_R,A_{\rm sew}\) 表格采用与 `ConstructProjectedSewingRelativeChiralBasis` 加右侧极化过滤后相容的展示基底。特别地，\(d_{\rm amp}=4\) 的 projected 主函数计数为 order \(2\) 有一个结构、order \(3\) 有两个结构；低层 fixed-sector verification 的代表元不应直接替代表格代表元。
+
+在 \(d_{\rm amp}=3\) 时，只有 \(J_{12}=1\) 的两个 open-current 结构进入：
+
+| index | \(J_{12}\) | \(A_L\) | \(A_R\) | \(A_{\rm sew}\) |
+| --- | --- | --- | --- | --- |
+| \(L^{(3)}_1\) | \(1\) | \(\langle2J\rangle[1J]\) | \(\langle3J\rangle[34][4J]\) | \(\langle23\rangle[34][14]\) |
+| \(L^{(3)}_2\) | \(1\) | \(\langle1J\rangle[2J]\) | \(\langle3J\rangle[34][4J]\) | \(\langle13\rangle[34][24]\) |
+
+在 \(d_{\rm amp}=4\) 时，当前正确结果不是旧的 \(J_{12}=0\) 的 `Xhard/Xsoft` 行，而是两个 \(J_{12}=1\) residual block 与一个 raised \(J_{12}=2\) block：
+
+| index | \(J_{12}\) | \(A_L\) | \(A_R\) | \(A_{\rm sew}\) |
+| --- | --- | --- | --- | --- |
+| \(L^{(4)}_1\) | \(1\) | \([2J][1J]\) | \(\langle34\rangle[34][4J][4J]\) | \(\langle34\rangle[14][24][34]\) |
+| \(L^{(4)}_2\) | \(1\) | \(\langle1J\rangle\langle2J\rangle\) | \(\langle3J\rangle\langle3J\rangle[34]^2\) | \(\langle13\rangle\langle23\rangle[34]^2\) |
+| \(L^{(4)}_3\) | \(2\) | \([2J][1J]\langle QJ\rangle[QJ]\) | \(\langle3J\rangle[4J][4J][3J]\) | \(\langle3Q\rangle[14][24][3Q]\) |
+
+这些结构的 relative order 为
+
+$$
+d_{\rm rel}=d_{\rm amp}-J_{12}-n_x .
+$$
+
+对于显示的 \(d_{\rm amp}=4\) 三行，\(n_x=0\)。因此 \(L^{(3)}_1\)、\(L^{(3)}_2\) 与 \(L^{(4)}_3\) 同属 leading relative order；\(L^{(4)}_1\) 和 \(L^{(4)}_2\) 属于下一阶。文章中的 operator correspondence 采用 \(Q=P_1-P_2\) 对应 \(\bar B\) 与 \(B\) 之间的左右导数，并把 Lorentz 指标与 \(u_\mu\) 和 \(F_{\nu\rho}\) 作相应收缩。
+
+固定维数的 CF comparison 给出
+
+$$
 \operatorname{rank}M_{\rm CF}
 {}=
 \operatorname{rank}M_{\rm sew}
 {}=
-\operatorname{rank}M_{\rm joined}.
-\]
-The first equality says that the sewn rows have the correct dimension after
-independence extraction.  The second equality says that they do not miss any
-CF direction and do not add directions outside the CF span.
+\operatorname{rank}M_{\rm joined},
+$$
 
-This rank test is the correct practical criterion because the auxiliary right
-construction can generate redundant records.  There is no reason to expect a
-literal one-to-one map between raw auxiliary records and raw CF representatives.
-The physically meaningful statement is equality of the reduced local amplitude
-space.
+并且在 \(d_{\rm amp}=3,4,5,6\) 的 rank 分别为 \(2,3,4,5\)。\(d_{\rm amp}=5,6\) 的计算只作为一致性检查；它们不改变上述 leading 与 next-to-leading 的分类。
 
-## Explicit four-point example
+## 结论与局限
 
-Take
-\[
-\ell=\frac12,\qquad R=\{1,0\},\qquad
-\mathrm{mass}=\{3\},\qquad
-\mathrm{polarization}=\{1,0\},\qquad d_{\rm amp}=4 .
-\]
-In words, the right side contains a spin-one particle on leg \(3\) and a scalar
-on leg \(4\).  Leg \(3\) is massive and carries polarization label \(1\), while
-leg \(4\) is massless with polarization label \(0\).
+当前方法已经建立了等自旋重粒子对局域振幅的可执行 factorized construction。左侧三点 current 负责全部 heavy-pair hard scaling，右侧 residual block 保存原 full contact amplitude 的局域数据；对当前返回的 sector，全对称缝合后的 span 经由 CF block 的 reduced-rank comparison 验证为等价。程序最终输出以 symbolic form 展示，使 `Q`、`Xhard` 和 `Xsoft` 的物理含义可读，而内部约化始终使用真实 amp form。
 
-The reproduction path is:
-
-1. Enumerate the left spin-one-half open basis.  The \(J=0\) entries are
-closed \(x,y\) factors.  The \(J=1\) entries are the four open structures
-\[
-[1J]\langle2J\rangle,\qquad
-\langle1J\rangle[2J],\qquad
-[1J][2J],\qquad
-\langle1J\rangle\langle2J\rangle ,
-\]
-with the square partners of legs \(1,2\) written as \(8,7\) in four-point
-notation after massive-square relabeling.
-
-2. Apply the chosen \(Q\)-convention to any \(Q\)-raising factor.  In this
-example \(J=1\) does not need a \(Q\)-raising power, but the same code path
-keeps the default deterministic convention \(Q\to2\).
-
-3. For each left record, build the right residual auxiliary problem at
-\[
-d_{\rm R}=d_{\rm amp}-d_{\rm L}^{(0)} .
-\]
-For the open record
-\[
-A_{\rm L}=\langle2J\rangle[8J],
-\]
-one has \(d_{\rm L}^{(0)}=0\), hence \(d_{\rm R}=4\).
-
-4. Generate right auxiliary SSYT records, translate them to formal \(J\)-slot
-records, and keep the ones with the correct metadata.  One surviving right
-record is
-\[
-A_{\rm R}=\langle23\rangle\langle4J\rangle[24][6J].
-\]
-
-5. Contract the \(J\) slots symmetrically, reduce to the massless quotient
-space, and collect the coordinate vector.
-
-The independent CF block has four rows.  The sewing construction generates ten
-raw records, from which four independent rows span the same reduced space:
-\[
-\#C_{\rm CF}=4,\qquad \#A_{\rm sew}=10,\qquad
-\operatorname{rank}(M_{\rm CF},M_{\rm sew},M_{\rm joined})=(4,4,4).
-\]
-One reduced monomial basis is
-\[
-\begin{aligned}
-e_1&=\langle24\rangle\langle34\rangle[14][34],\\
-e_2&=\langle24\rangle^2[14][24],\\
-e_3&=\langle14\rangle\langle24\rangle[24]^2,\\
-e_4&=\langle14\rangle\langle34\rangle[24][34].
-\end{aligned}
-\]
-The CF coefficient matrix is
-\[
-M_{\rm CF}=
-\begin{pmatrix}
-1&0&0&0\\
-0&1&0&0\\
-0&0&1&0\\
-0&0&-1&-1
-\end{pmatrix}.
-\]
-One independent sewn basis has coefficient matrix
-\[
-M_{\rm sew}=
-\begin{pmatrix}
-0&-1&0&0\\
--1&-1&0&0\\
-0&0&-1&-1\\
-0&0&-1&0
-\end{pmatrix}.
-\]
-Both matrices have rank four, and the joined matrix also has rank four.
-Therefore the sewn basis and the CF basis are different bases for the same
-four-dimensional reduced space.
-
-A single row of this example can be followed explicitly.  Choose the left
-factor
-\[
-A_{\rm L}=\langle2J\rangle[8J],
-\]
-which is the \(Q\to2\) component of a spin-one-half \(J\)-open structure.  One
-compatible right factor is
-\[
-A_{\rm R}=\langle23\rangle\langle4J\rangle[24][6J].
-\]
-The symmetric \(J\)-slot contraction gives a full four-point expression whose
-reduced coordinate vector in the basis \((e_1,e_2,e_3,e_4)\) is
-\[
-(0,-1,0,0).
-\]
-Thus this single sewn row contributes the direction \(-e_2\).  The remaining
-independent sewn rows shown in \(M_{\rm sew}\) complete the four-dimensional
-span.
-
-This example is also useful because earlier incomplete right-block
-constructions produced zero-coordinate rows in this sector.  Those rows traced
-back to invalid auxiliary self-columns and missing formal-\(J\) structures.
-The current filters remove the invalid terms and recover the full CF span.
-
-## Explicit five-point example
-
-Take
-\[
-\ell=\frac12,\qquad R=\{1,1,1\},\qquad
-\mathrm{mass}=\{3\},\qquad
-\mathrm{polarization}=\{1,0,0\},\qquad d_{\rm amp}=5 .
-\]
-The rank summary is
-\[
-\#C_{\rm CF}=13,\qquad \#A_{\rm sew}=19,\qquad
-\operatorname{rank}(M_{\rm CF},M_{\rm sew},M_{\rm joined})=(13,13,13).
-\]
-This case checks that the method is not only a four-point accident.  The right
-auxiliary construction must preserve the extra local invariants involving
-\(Q\) and the additional light momentum, and the joined-rank equality confirms
-that the sewn records span the same reduced local space as the direct CF
-construction.
-
-## Spin three-halves checks
-
-The most important extension beyond the spin-one-half pair is
-\[
-\ell=\frac32 .
-\]
-The dedicated systematic scan includes four-point sectors with right spins
-\[
-\{1,1\},\quad \{1,0\},\quad \{0,1\},\quad
-\{2,1\},\quad \{1,2\},\quad \{2,0\},
-\]
-all allowed right mass choices for those spins, all right polarizations in the
-allowed massive-spin ranges, and
-\[
-d_{\rm amp}=5,6 .
-\]
-It also includes representative five-point cases
-\[
-\{1,1,1\},\quad \{1,1,0\},\quad \{1,0,1\},\quad
-\{0,1,1\},\quad \{2,1,1\},\quad \{1,2,1\},
-\]
-at \(d_{\rm amp}=6\), plus representative six-point cases
-\[
-\{1,1,1,1\},\qquad \{1,1,1,0\},
-\]
-at \(d_{\rm amp}=6\).
-
-The result was
-\[
-\begin{array}{c|c}
-\text{quantity} & \text{value}\\
-\hline
-\text{total cases} & 365\\
-\text{compared cases} & 365\\
-\text{complete cases} & 365\\
-\text{nontrivial complete cases} & 114\\
-\text{vacuous complete cases} & 251\\
-\text{failed or timed out cases} & 0
-\end{array}
-\]
-Thus no counterexample was found in the systematic \(\ell=3/2\) scan.
-
-Several additional stress tests include right spin \(2\), mixed massless and
-massive assignments, and six-point amplitudes.  In the recorded spin-2 and
-six-point stress scan, all fourteen tested cases completed successfully, with
-nine nontrivial nonzero sectors.  A follow-up higher-dimension scan completed
-all five selected cases, with three nontrivial nonzero sectors.
-
-## Current evidence summary
-
-The checked evidence can be summarized as follows:
-
-| scan | cases | nontrivial cases | result |
-| --- | ---: | ---: | --- |
-| broad four-point and five-point scan | 391 | 99 | rank-complete under the reduced-span test |
-| spin-2, six-point, and left-\(3/2\) stress scan | 14 | 9 | rank-complete under the reduced-span test |
-| higher-dimension follow-up scan | 5 | 3 | rank-complete under the reduced-span test |
-| dedicated left-\(3/2\) systematic scan | 365 | 114 | rank-complete under the reduced-span test |
-| \(Q=2\) versus \(Q=1+2\) representative probe | 7 pairs | 7 pairs | same ranks |
-
-For every nonempty checked sector,
-\[
-\operatorname{rank}M_{\rm CF}
-{}=
-\operatorname{rank}M_{\rm sew}
-{}=
-\operatorname{rank}M_{\rm joined}.
-\]
-For every empty checked sector, both constructions give rank zero.  This is a
-useful consistency check rather than a nontrivial basis match.
-
-## Interpretation
-
-The construction is reliable for the checked equal-spin heavy-pair sectors for
-the following reasons.
-
-1. The left block is a finite representation-theory problem.  For
-\(\ell+\ell+J\), the open-slot formula above gives the expected saturation
-pattern: once \(J\ge2\ell\), all heavy spin slots are resolved and increasing
-\(J\) only inserts \(Q\)-raising factors.
-2. The right block is generated by the same SSYT/on-shell machinery that
-constructs complete local amplitudes, with auxiliary labels used only to mark
-formal \(J\) slots and supplemental heavy-pair columns.
-3. The sewing contraction respects the full symmetry of the current
-little-group representation by summing all \(J\)-slot pairings with
-multiplicity.
-4. The final comparison is performed after the same massless-limit reduction
-used for `ConstructIndepCFBlock`, so the test is made in the physical quotient
-space where EoM, Schouten, and momentum-conservation identities have already
-been imposed.
-5. The rank criterion checks both completeness and independence at once:
-matching CF rank alone would be insufficient, but equality with the joined rank
-shows equality of spans.
-
-The main remaining theoretical gap is a proof that the auxiliary
-\(S_a=S_b\) scan plus formal-\(J\) filters is equivalent to the direct formal
-\(J\)-slot SSYT enumeration for all equal-spin sectors.  The current scans give
-strong executable evidence for this equivalence in the sectors relevant to the
-present applications, including spin \(1/2\), spin \(3/2\), right spin \(2\),
-mixed mass assignments, and representative six-point cases.
-The explicit scan envelope recorded here reaches
-\[
-n\le6,\qquad d_{\rm amp}\le6,\qquad \ell\le\frac32,
-\]
-with right spins including \(0,1,2\), both massless and massive right legs, and
-the quoted 226 nontrivial rank-complete sectors across the listed scans.  The
-default general constructor uses
-\[
-J_{\max}=\left\lfloor \frac{d_{\rm amp}}{2}\right\rfloor
-\]
-unless a larger value is supplied explicitly; the dedicated left-\(3/2\) scan
-used \(J_{\max}=5\).
-
-## Reproducibility
-
-The main implementation is
-\[
-\texttt{Codes/MassiveAmplitude-Code/Package/Codes/Sewing.m}.
-\]
-The supporting notes are
-\[
-\texttt{Codes/MassiveAmplitude-Code/note/three\_point\_open\_basis\_summary.md},
-\]
-\[
-\texttt{Codes/MassiveAmplitude-Code/note/sewing\_completeness\_scan\_note.md},
-\]
-and
-\[
-\texttt{Codes/MassiveAmplitude-Code/note/q\_replacement\_sewing\_note.md}.
-\]
-The principal executable checks are
-\[
-\texttt{wolframscript -file .\backslash Codes\backslash MassiveAmplitude-Code\backslash Test\backslash sewing\_extended\_scan.wls},
-\]
-\[
-\texttt{wolframscript -file .\backslash Codes\backslash MassiveAmplitude-Code\backslash Test\backslash sewing\_spin2\_6pt\_left32\_scan.wls},
-\]
-\[
-\texttt{wolframscript -file .\backslash Codes\backslash MassiveAmplitude-Code\backslash Test\backslash sewing\_left32\_spin2\_followup\_scan.wls},
-\]
-\[
-\texttt{wolframscript -file .\backslash Codes\backslash MassiveAmplitude-Code\backslash Test\backslash sewing\_left32\_systematic\_scan.wls},
-\]
-and
-\[
-\texttt{wolframscript -file .\backslash Codes\backslash MassiveAmplitude-Code\backslash Test\backslash sewing\_qsum\_current\_probe.wls}.
-\]
-The default regression suite is
-\[
-\texttt{wolframscript -file .\backslash Codes\backslash MassiveAmplitude-Code\backslash Test\backslash run\_all.wls}.
-\]
-
-## Appendix: review log
-
-### Expert review pass
-
-The expert-level review identified three points that had to be made sharper:
-
-1. The note must not claim a global theorem beyond the checked equal-spin
-sectors.  The conclusion is a reduced-span equality supported by broad
-executable checks.
-2. The right block must be described as embedded in the full local amplitude
-space, not as an ordinary on-shell amplitude with one fewer physical leg.
-Otherwise the \(Q\cdot p_i\) data would appear to be lost.
-3. The auxiliary-particle construction must state that \(S_a=S_b\) is a
-convention with a scan over the common magnitude \(s\), not a single fixed
-auxiliary-spin choice.
-
-These changes are incorporated in the purpose, right-block, and interpretation
-sections above.
-The expert review also requested the notation fix \(S_N\to S_{n_J}\), a clear
-statement that \(Q\to2\) is only a computational convention, and explicit scan
-bounds.  Those changes are included above.
-
-### Student-reader pass
-
-The student-level review found that three definitions needed to be more
-explicit:
-
-1. The dot \(\cdot\) is an open current slot, not a new external particle.
-2. The symbols \(x,y\) are closed heavy-pair scalar factors, not open slots.
-3. The rank comparison should be read as comparing coordinates in the same
-monomial vector space after reduction.
-
-These clarifications are included in the left-basis and reduction sections.
-The student review also requested a notation table, a formal-\(J\) column
-example, a \(d_{\rm L}^{(0)}\) example, and one complete left-right-coordinate
-path.  Those additions are included above.
+尚未在本文中证明的部分是更一般的数学定理：即辅助无质量粒子实现的右侧 residual 构造在所有可能 sector 中都与直接 formal \(J\)-slot SSYT 后端完全等价。当前程序以 CF rank comparison 作为每个 sector 的可执行验证。若将来推广到不等自旋重粒子对、非当前 SU(3) 形状约定或更复杂的 gauge structure，需要同步更新左侧三点结构、右侧 residual 过滤条件和投影矩阵验证。

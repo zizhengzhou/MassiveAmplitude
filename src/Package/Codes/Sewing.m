@@ -451,7 +451,9 @@ CompareRightResidualBackends[target_Association, nCols_Integer?NonNegative, opts
 
 ClearAll[
   SewingAuxiliaryBracketQ, SewingAmpCounts, SewingAutomaticAuxiliarySpinRange,
-  SewingAuxiliarySpinPairs, SewingConstructAmpRaw
+  SewingAuxiliarySpinPairs, SewingConstructAmpRaw,
+  SewingZeroJTargetQ,
+  SewingScalarIdentityRightResidualQ, SewingScalarIdentityRightResidualRecord
 ];
 SewingAuxiliaryBracketQ[f_, auxLabels_List] :=
   MatchQ[f, _ab | _sb] && ! DisjointQ[List @@ f, auxLabels];
@@ -523,6 +525,57 @@ SewingConstructAmpRaw[spins_List, codeDim_Integer, antispinorsIn_List, massesIn_
   amps
 ];
 
+SewingZeroJTargetQ[Automatic] := True;
+SewingZeroJTargetQ[target_Association] := Module[{normalized = SewingNormalizeJTarget[target]},
+  normalized["AngleJ"] === 0 && normalized["SquareJ"] === 0
+];
+SewingZeroJTargetQ[_] := False;
+
+SewingScalarIdentityRightResidualQ[
+  rightSpins_List,
+  rightAmpDim_Integer?NonNegative,
+  rightPolarization_List,
+  target_
+] := rightAmpDim === 0 &&
+  rightSpins === ConstantArray[0, Length[rightSpins]] &&
+  rightPolarization === ConstantArray[0, Length[rightSpins]] &&
+  SewingZeroJTargetQ[target];
+
+SewingScalarIdentityRightResidualRecord[
+  rightSpins_List,
+  rightAmpDim_Integer?NonNegative,
+  rightPolarization_List,
+  target_,
+  labels_,
+  codeDimOpt_,
+  auxLabels_List,
+  jLabel_
+] := Module[
+  {recordLabels, counts, spins, antispinor, codeDim},
+  recordLabels = Replace[
+    labels,
+    Automatic -> If[AssociationQ[target], Lookup[target, "Labels", {jLabel}], {jLabel}]
+  ];
+  counts = {SewingZeroCounts[recordLabels], SewingZeroCounts[recordLabels]};
+  spins = Join[ConstantArray[0, Length[auxLabels]], rightSpins];
+  antispinor = Join[ConstantArray[0, Length[auxLabels]], rightPolarization];
+  codeDim = Replace[codeDimOpt, Automatic -> rightAmpDim + Length[spins]];
+  <|
+    "Method" -> "ScalarIdentityRightResidual",
+    "AuxiliarySpin" -> ConstantArray[0, Length[auxLabels]],
+    "Spins" -> spins,
+    "Antispinor" -> antispinor,
+    "CodeDim" -> codeDim,
+    "RightAmpDim" -> rightAmpDim,
+    "AuxiliaryAmp" -> 1,
+    "AmpR" -> 1,
+    "ProjectedAmpR" -> 1,
+    "ProjectedJCounts" -> <|"AngleJ" -> 0, "SquareJ" -> 0, "TotalJ" -> 0|>,
+    "AngleCounts" -> counts[[1]],
+    "SquareCounts" -> counts[[2]]
+  |>
+];
+
 Options[SewingAuxiliaryAmpToFormalJ] = {
   AuxiliaryLabels -> {1, 2},
   JLabel -> J
@@ -587,6 +640,26 @@ ConstructRightAuxiliaryOnShellRecords[rightSpins_List, nCols_Integer?NonNegative
   jLabel = OptionValue[JLabel];
   codeDimOpt = OptionValue[CodeDim];
   masses = OptionValue[mass];
+  If[
+    SewingScalarIdentityRightResidualQ[rightSpins, nCols, rightAntispinor, target],
+    SewingLog[
+      debug,
+      "RightAuxiliary.ScalarIdentity",
+      <|"RightSpins" -> rightSpins, "nCols" -> nCols, "RightAntispinor" -> rightAntispinor|>
+    ];
+    Return[{
+      SewingScalarIdentityRightResidualRecord[
+        rightSpins,
+        nCols,
+        rightAntispinor,
+        target,
+        labels,
+        codeDimOpt,
+        auxLabels,
+        jLabel
+      ]
+    }]
+  ];
   spinPairs = SewingAuxiliarySpinPairs[
     rightSpins,
     Replace[codeDimOpt, Automatic -> nCols + 2 + Length[rightSpins]],
@@ -1852,7 +1925,7 @@ SewingIndependentBlockFromRecords[records_List, basis_: Automatic, OptionsPatter
   reduced = Lookup[records, "ReducedAmp", {}];
   monoms = Replace[basis, Automatic -> Poly2Singlet[reduced]];
   If[Length[monoms] == 0, Return[empty]];
-  matrix = Table[Coefficient[Expand[row], monom], {row, reduced}, {monom, monoms}];
+  matrix = Table[SpinorMonomialCoefficient[row, monom], {row, reduced}, {monom, monoms}];
   posIndep = FindIndependentBasisPos[matrix];
   selected = records[[posIndep]];
   outputAmps = Switch[
@@ -1877,12 +1950,12 @@ Options[SewingCoeffMatrixDataUnion] = {};
 SewingCoeffMatrixDataUnion[records_List, basis_List] := Module[{reduced, matrix},
   If[Length[records] == 0, Return[<|"Monomials" -> basis, "Matrix" -> {}, "Rank" -> 0|>]];
   reduced = records[[All, "ReducedAmp"]];
-  matrix = Table[Coefficient[Expand[row], monom], {row, reduced}, {monom, basis}];
+  matrix = Table[SpinorMonomialCoefficient[row, monom], {row, reduced}, {monom, basis}];
   <|"Monomials" -> basis, "Matrix" -> matrix, "Rank" -> MatrixRank[matrix]|>
 ];
 
 SewingProjectReducedAmpToBasis[amp_, basis_List] := Expand[
-  Total[Coefficient[Expand[amp], #] # & /@ basis]
+  Total[SpinorMonomialCoefficient[amp, #] # & /@ basis]
 ];
 
 SewingMergeCFBlocks::usage =
@@ -1900,7 +1973,7 @@ SewingMergeCFBlocks[cfBlocks_List] := Module[
   ];
   basis = Poly2Singlet[reducedRows];
   If[Length[basis] == 0, Return[{}]];
-  matrix = Table[Coefficient[Expand[row], monom], {row, reducedRows}, {monom, basis}];
+  matrix = Table[SpinorMonomialCoefficient[row, monom], {row, reducedRows}, {monom, basis}];
   positions = FindIndependentBasisPos[matrix];
   {amps[[positions]], matrix[[positions]], basis}
 ];

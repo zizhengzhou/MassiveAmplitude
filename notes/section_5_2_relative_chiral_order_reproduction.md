@@ -4,7 +4,8 @@
 
 This note records the successful executable reproduction of the relative
 chiral-order ordering for the \((\bar B,B,u,f_+)=(1,2,3,4)\) sewing example.
-It supersedes the older `d_amp - n_x` bookkeeping for this code path.
+It supersedes the older bookkeeping that did not subtract the transmitted
+angular momentum \(J\) for this code path.
 
 ## Sector
 
@@ -27,11 +28,11 @@ massless vector leg at position 4.
 The relative chiral-order label used by the current test is
 
 ```wl
-RelativeOrder = AmpDim - XPower - J
+RelativeOrder = AmpDim - XhardPower - J
 ```
 
-where `XPower` is `SewingStaticXPower[rec]`.  In the present implementation
-this directly reads the `Xhard` power stored in `SortData`.
+where `XhardPower` is `SewingStaticXPower[rec]`.  In the present
+implementation this directly reads the `Xhard` power stored in `SortData`.
 
 The global table is not obtained by independently reducing each fixed
 `ampDim` space first.  The tested procedure is:

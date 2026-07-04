@@ -16,8 +16,10 @@ Inside the sewing package, massive particles are represented by ordinary
 symbols `m1`, `m2`, ..., not by formatted subscript strings.  This avoids
 dimension-enumeration artifacts in the legacy CF machinery.
 
-`rightMass -> {3}` means particle 3 is massive.  `rightMass -> {3, 4}` means
-particles 3 and 4 are massive.
+In `ConstructProjectedSewingRelativeChiralBasis`, the optional positional
+argument `rightMass` and the option `RightMass` refer only to right-side
+particles.  Thus positional `{3}` or `RightMass -> {3}` means particle 3 is a
+massive right-side particle; particles 1 and 2 are always massive internally.
 
 ## Formal Q
 

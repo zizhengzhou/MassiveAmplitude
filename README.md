@@ -141,9 +141,14 @@ For an \(n\)-point amplitude, the constructor uses this workflow:
 
 ## Documentation
 
+* `docs/program-user-guide.zh.md`: Chinese user guide for installation,
+  deployment, examples, output interpretation, and modification policy.
 * `docs/api.md`: public and expert API surface.
 * `docs/physics-conventions.md`: spinor, mass, Q, X, identical, SU(3), and
   relative chiral-order conventions.
+* `notes/left_right_sewing_construction_note.md`: Chinese method note covering
+  the mathematical construction, computational realization, program interface,
+  and the \(\bar B B u f_+\) example.
 * `docs/testing.md`: maintained tests, note-generation scripts, and removed
   probes.
 * `docs/release-checklist.md`: tasks before a public release.

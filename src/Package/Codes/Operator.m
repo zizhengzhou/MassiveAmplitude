@@ -24,6 +24,10 @@ BreakBracket[bra_] := {bra[[0]], bra[[1]], bra[[2]]};
 Options[Amp2MetaInfo] = {mass -> All};
 Amp2MetaInfo[amp_, np_Integer, OptionsPattern[]] := Module[
   {masses, rule, braList , fun, particleList, massiveParticleList, spins, antispinors},
+  If[FreeQ[amp, _ab | _sb],
+    If[TrueQ[Expand[amp] === 0], Return[Null]];
+    Return[{ConstantArray[0, np], ConstantArray[0, np]}]
+  ];
   masses = MassOption[OptionValue@mass, np];
   braList = BreakBracket /@ Amp2BrasList[amp][[2]];
   rule[type_, ind_] := {type, ind, _} | {type, _, ind};

@@ -8,16 +8,29 @@
 (*involved ConstructAmp Reduce funs*)
 
 
-ClearAll[Poly2Singlet];
+ClearAll[Poly2Singlet, SpinorMonomialCoefficient];
 Poly2Singlet::usage =
   "Poly2Singlet[expr] extracts distinct monomial terms from a polynomial expression, dropping numeric coefficients.";
+SpinorMonomialCoefficient::usage =
+  "SpinorMonomialCoefficient[expr, monomial] returns the coefficient of a spinor monomial, treating monomial 1 as the spinor-polynomial constant term.";
 Poly2Singlet[amp_List] := Poly2Singlet /@ amp // Flatten // DeleteDuplicates;
 Poly2Singlet[amp_Plus] := Poly2Singlet /@ (List @@ amp) // Flatten // DeleteDuplicates;
 Poly2Singlet[c_?NumberQ * b_] := {b};
 Poly2Singlet[-b_] := {b};
-Poly2Singlet[c_?NumberQ] := {};
+Poly2Singlet[c_?NumberQ] := If[TrueQ[c == 0], {}, {1}];
 Poly2Singlet[b_] := {b};
+SpinorMonomialCoefficient[expr_, 1] := Expand[expr /. (_ab | _sb) -> 0];
+SpinorMonomialCoefficient[expr_, monomial_] := Coefficient[Expand[expr], monomial];
 ClearAll[ConstructIndepCFBlock];
+ClearAll[SewingScalarIdentityCFBlockQ];
+SewingScalarIdentityCFBlockQ[spins_List, codeDim_, polarization_List] := Module[
+  {np = Length[spins]},
+  IntegerQ[codeDim] &&
+    codeDim === np &&
+    spins === ConstantArray[0, np] &&
+    polarization === ConstantArray[0, np]
+];
+
 Options@ConstructIndepCFBlock = {mass -> All, timeDebug -> False};
 ConstructIndepCFBlock::usage =
   "ConstructIndepCFBlock[spins, codeDim, polarization, opts] constructs a fixed-polarization CF block, reduces it in the massless limit, removes local linear redundancy, and returns {independentAmplitudes, coefficientMatrix, monomialBasis}.";
@@ -29,6 +42,9 @@ ConstructIndepCFBlock[spins_List, codeDim_, polarization_List, OptionsPattern[]]
        Print[label <> " cost ", time, "s"];
        result];,
     TimingPrint[label_String][{time_, result_}] := result;];
+   If[SewingScalarIdentityCFBlockQ[spins, codeDim, polarization],
+    Return[{{1}, {{1}}, {1}}]
+   ];
    cf0 = ConstructAmp[spins, codeDim, antispinor -> polarization, mass -> OptionValue@mass] // AbsoluteTiming // TimingPrint["construct cf"];
    If[Length@cf0 == 0, Return[{}]];
    masslessLimitRule = Table[2*np + 1 - i -> i, {i, np}];
@@ -37,7 +53,7 @@ ConstructIndepCFBlock[spins_List, codeDim_, polarization_List, OptionsPattern[]]
    (*The reduce here could be improved future*)
    basis = Poly2Singlet@rcfHE // AbsoluteTiming // TimingPrint["find cfHE basis"];
    If[Length@basis == 0, Return[{}]];
-   coeff = Table[Coefficient[a, b], {a, rcfHE}, {b, basis}];
+   coeff = Table[SpinorMonomialCoefficient[a, b], {a, rcfHE}, {b, basis}];
    posIndep = FindIndependentBasisPos[coeff];
    {cf0[[posIndep]], coeff[[posIndep]], basis}
    ];
@@ -99,7 +115,7 @@ masslessLimitCF=ReplaceBraNumber[masslessLimitRule]/@cfs;
 CalcRuleMatrix[{}]:=IdentityMatrix[Length[cfs]];
 CalcRuleMatrix[rule_]:=Module[{rcfs,ruleMatrix},
 rcfs=Table[ReduceSt[np][ReplaceBraNumber[rule][amp]],{amp,masslessLimitCF}];
-ruleMatrix=Table[Coefficient[a,b],{a,rcfs},{b,basis}];
+ruleMatrix=Table[SpinorMonomialCoefficient[a,b],{a,rcfs},{b,basis}];
 (*OC0=C1 -->  O = (LinearSolve[C0T,C1T])T*)
 Transpose@LinearSolve[Transpose[coeffs],Transpose[ruleMatrix]]];
 Do[rules=GetMasslessIdenticalRules[id];
