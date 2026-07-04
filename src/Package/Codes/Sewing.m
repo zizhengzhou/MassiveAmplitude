@@ -34,6 +34,7 @@ ClearAll[
   SewingStaticXPower, SewingRelativeChiralOrder, SewingChiralSortKey, SewingSortRecordsByChiralOrder,
   SewingBasisSortKey, SewingSortRecordsForBasis,
   SewingPerformanceTimed,
+  SewingZeroMatrixQ, SewingNormalizeProjectorMatrix,
   ConstructSewingRelativeChiralBasis,
   SewingIdenticalTypeList, SewingMatrixBlockDiagonalByJQ, SewingTotalYoungOperator,
   SewingColorDataForIdenticalInfo, SewingDirectProductBasisItems, SewingGroupProjectedItemsByChiralOrder,
@@ -2436,19 +2437,43 @@ SewingMatrixBlockDiagonalByJQ[matrix_?MatrixQ, records_List] := Module[
       If[i == j, Nothing, matrix[[groups[[i]], groups[[j]]]]],
       {i, Length[groups]}, {j, Length[groups]}
     ],
-    2
+    Infinity
   ];
-  FreeQ[offBlocks, Except[0]]
+  AllTrue[offBlocks, # === 0 &]
 ];
 
+SewingZeroMatrixQ[matrix_] := AllTrue[Flatten[Expand[matrix]], # === 0 &];
+
+SewingNormalizeProjectorMatrix[matrix_?MatrixQ] := Module[
+  {square, nonzeroPositions, scale},
+  If[Length[matrix] == 0, Return[matrix]];
+  square = matrix . matrix;
+  If[SewingZeroMatrixQ[matrix], Return[matrix]];
+  nonzeroPositions = Flatten[
+    Table[
+      If[matrix[[rowIndex, columnIndex]] =!= 0, {{rowIndex, columnIndex}}, Nothing],
+      {rowIndex, Length[matrix]}, {columnIndex, Length[First[matrix]]}
+    ],
+    2
+  ];
+  If[Length[nonzeroPositions] == 0, Return[matrix]];
+  scale = (square[[Sequence @@ First[nonzeroPositions]]]/matrix[[Sequence @@ First[nonzeroPositions]]]) // Simplify;
+  If[scale === 0 || ! SewingZeroMatrixQ[square - scale matrix],
+    matrix,
+    Simplify[matrix/scale]
+  ]
+];
+SewingNormalizeProjectorMatrix[other_] := other;
+
 SewingTotalYoungOperator[operatorDict_Association, identicalInfo_List, identicalPolyDict_Association] := Module[
-  {nonemptyInfo = Select[identicalInfo, KeyExistsQ[identicalPolyDict, #] && KeyExistsQ[operatorDict, #] &]},
+  {nonemptyInfo = Select[identicalInfo, KeyExistsQ[identicalPolyDict, #] && KeyExistsQ[operatorDict, #] &], operator},
   If[Length[nonemptyInfo] == 0,
     If[Length[operatorDict] == 0,
       {},
       IdentityMatrix[Length[First[First /@ Values[operatorDict]][[2]]]]
     ],
-    Dot @@ Table[identicalPolyDict[id] /. operatorDict[id], {id, nonemptyInfo}]
+    operator = Dot @@ Table[identicalPolyDict[id] /. operatorDict[id], {id, nonemptyInfo}];
+    SewingNormalizeProjectorMatrix[operator]
   ]
 ];
 
@@ -2793,7 +2818,8 @@ ConstructProjectedSewingRelativeChiralBasis[
     projectedItemGroups, allProjectedItems, groupedBasis, getLeftRecordsForJ, getRecordsForRightPolarization,
     getColorData, fullPolarization, rightPolarization, localCFBlock,
     identicalInfo, sewingRecords, projection, colorData, totalOperator,
-    directProductItems, projectedItems, independentPositions, colorOperatorDict,
+    directProductLorentzRecords, directProductItems,
+    projectedItems, independentPositions, colorOperatorDict,
     colorBasis, hasSU3, su3IndDict, totalIdenticalOperator, totalJDiagnostics,
     sectorOutput, expectedDirectCount, outputCount, qSpec, blockAmpDim, finalQSpec
   },
@@ -3042,8 +3068,12 @@ ConstructProjectedSewingRelativeChiralBasis[
       su3IndDict = colorData["SU3IndexDictionary"];
       colorOperatorDict = colorData["SU3OperatorDictionary"];
       If[Length[colorBasis] == 0, Continue[]];
+      directProductLorentzRecords = If[TrueQ[hasSU3] && Length[identicalInfo] > 0,
+        projection["RecordsBeforeIdentical"],
+        projection["Records"]
+      ];
       directProductItems = SewingDirectProductBasisItems[
-        projection["Records"],
+        directProductLorentzRecords,
         colorBasis,
         su3IndDict,
         hasSU3
@@ -3084,9 +3114,11 @@ ConstructProjectedSewingRelativeChiralBasis[
             {opKey, Keys[lorentzOps]}
           ]
         ];
-        totalIdenticalOperator = Dot @@ Table[
-          projection["IdenticalPolynomialDictionary"][id] /. totalOperator[id],
-          {id, identicalInfo}
+        totalIdenticalOperator = SewingNormalizeProjectorMatrix[
+          Dot @@ Table[
+            projection["IdenticalPolynomialDictionary"][id] /. totalOperator[id],
+            {id, identicalInfo}
+          ]
         ];
         independentPositions = SewingPerformanceTimed[
           traceRecord,

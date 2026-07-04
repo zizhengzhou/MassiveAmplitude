@@ -22,6 +22,7 @@ scripts = {
   "projected_right_polarization_filter_equivalence.wls",
   "projected_sewing_su3_probe.wls",
   "projected_identical_six_point_regression.wls",
+  "projected_identical_projection_regression.wls",
   "projected_performance_trace_smoke.wls",
   "performance_benchmark_smoke.wls",
   "scalar_identity_regression.wls",

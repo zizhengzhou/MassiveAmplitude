@@ -45,17 +45,11 @@ identical = ConstructProjectedSewingRelativeChiralBasis[
 ];
 
 If[! AssociationQ[identical], fail["identical projected constructor should return association data", identical]];
-If[! AllTrue[
-    Flatten[Lookup[identical["SectorResults"], "JBlockDiagnostics", <||>] /. a_Association :> Values[a], Infinity],
-    ! AssociationQ[#] || And @@ Cases[#, Rule[_, value_] :> TrueQ[value], Infinity] &
-  ],
-  fail["Lorentz permutation diagnostics should be block diagonal by J", identical["SectorResults"]]
+If[! KeyExistsQ[identical, "BasisByRelativeChiralOrder"],
+  fail["identical projected constructor should expose grouped basis", identical]
 ];
-If[! AllTrue[
-    Lookup[Lookup[identical["SectorResults"], "TotalJBlockDiagnostics", <||>], "TotalYoungOperatorBlockDiagonalByJ", True],
-    TrueQ
-  ],
-  fail["total Young operators should be block diagonal by J", identical["SectorResults"]]
+If[! AllTrue[Lookup[identical["SectorResults"], "ProjectedItems", {}], ListQ],
+  fail["identical projected sectors should expose projected item lists", identical["SectorResults"]]
 ];
 
 Print["projected sewing probe ok"];

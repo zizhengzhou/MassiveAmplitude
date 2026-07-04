@@ -108,17 +108,16 @@ ReAssignIdentical[{d_Integer, polar_List},identicals_List]:=ReAssignIdentical[po
 
 
 ClearAll[GetCFBlockPermuteOperatorDict]; 
-GetCFBlockPermuteOperatorDict[cfBlock:{cfs_List,coeffs_List,basis_List},identicals_List,np_Integer]:=Module[{operatorDict,masslessLimitRule,masslessLimitCF,CalcRuleMatrix,rules},
+GetCFBlockPermuteOperatorDict[cfBlock:{cfs_List,coeffs_List,basis_List},identicals_List,np_Integer]:=Module[{operatorDict,masslessLimitRule,CalcRuleMatrix,rules},
 operatorDict=Association@Table[id->Null,{id,identicals}];
 masslessLimitRule=Table[2*np+1-i->i,{i,np}];
-masslessLimitCF=ReplaceBraNumber[masslessLimitRule]/@cfs;
 CalcRuleMatrix[{}]:=IdentityMatrix[Length[cfs]];
 CalcRuleMatrix[rule_]:=Module[{rcfs,ruleMatrix},
-rcfs=Table[ReduceSt[np][ReplaceBraNumber[rule][amp]],{amp,masslessLimitCF}];
+rcfs=Table[ReduceSt[np][ReplaceBraNumber[masslessLimitRule][ReplaceBraNumber[rule][amp]]],{amp,cfs}];
 ruleMatrix=Table[SpinorMonomialCoefficient[a,b],{a,rcfs},{b,basis}];
 (*OC0=C1 -->  O = (LinearSolve[C0T,C1T])T*)
 Transpose@LinearSolve[Transpose[coeffs],Transpose[ruleMatrix]]];
-Do[rules=GetMasslessIdenticalRules[id];
+Do[rules=GetMassiveIdenticalRules[id,np];
 Which[
 Length[rules]==1,operatorDict[id]={1->IdentityMatrix[Length[cfs]]},
 Length[rules]==2,operatorDict[id]={1->IdentityMatrix[Length[cfs]],symPermuteFirst->CalcRuleMatrix[rules[[2]]]},
